@@ -25,7 +25,7 @@
             .service("ListMessgaes", svcListMessages)
             .controller("new_machine", newMachineCtrl)
             //.controller("SupportForm", suppFormCtrl)
-            .controller("machines", machinesCrtl)
+            .controller("machines", machinesCtrl)
             .controller("bases", mainpageCrtl)
             .controller("messages", messagesCrtl)
 	        .controller("users", usersCrtl)
@@ -107,35 +107,35 @@
 
 
     function svcShutdown ( $resource ){
-        return $resource('/machine/shutdown/:id',{id:'@id'});
+        return $resource('/machine/shutdown/:id.json',{id:'@id'});
     };
 
     function svcScreenshot ( $resource ){
-        return $resource('/machine/screenshot/:id',{id:'@id'});
+        return $resource('/machine/screenshot/:id.json',{id:'@id'});
     };
 
     function svcPrepare ( $resource ){
-        return $resource('/machine/prepare/:id',{id:'@id'});
+        return $resource('/machine/prepare/:id.json',{id:'@id'});
     };
 
     function svcPause ( $resource ){
-        return $resource('/machine/pause/:id',{id:'@id'});
+        return $resource('/machine/pause/:id.json',{id:'@id'});
     };
 
     function svcResume ( $resource ){
-        return $resource('/machine/resume/:id',{id:'@id'});
+        return $resource('/machine/resume/:id.json',{id:'@id'});
     };
 
     function svcStart ( $resource ){
-        return $resource('/machine/start/:id',{id:'@id'});
+        return $resource('/machine/start/:id.json',{id:'@id'});
     };
 
     function svcRemoveB ( $resource ){
-        return $resource('/machine/remove_b/:id',{id:'@id'});
+        return $resource('/machine/remove_b/:id.json',{id:'@id'});
     };
 
     function svcAsRead ( $resource ){
-        return $resource('/messages/read/:id',{id:'@id'});
+        return $resource('/messages/read/:id.json',{id:'@id'});
     };
 
     function svcReadAll ( $resource ){
@@ -223,29 +223,31 @@
 
     };*/
 
-    function machinesCrtl($scope, $http, request, listMach, Shutdown, Prepare, Screenshot, Pause, Resume, Start, RemoveB, PingBE, ListMach) {
+    function machinesCtrl($scope, $http, Shutdown, Prepare, Screenshot, Pause, Resume, Start, RemoveB, PingBE, ListMach) {
 
         
         //if ( typeof $_anonymous !== 'undefined' && $_anonymous ) {
         //    $url_list = "/list_bases_anonymous.json";
         //}
-        
+                
+        $scope.reload = function() {
+            if ( typeof $_anonymous !== 'undefined' && $_anonymous ) {
+                $scope.list_machines = ListMachA.get();
+            }
+            else{
+                $scope.list_machines = ListMach.get();
+            }
+            
+            $scope.pingbe_fail = PingBE.get();
+        };
 
-        $scope.list_machines = ListMach.get;
-
-        request.get(function( res ) {
-            $scope.res = res;
-        });
-
-        $http.get('/pingbackend.json').then(function(response) {
-            $scope.pingbe_fail = !response.data;
-
-        });
+        $scope.reload();
 
         $scope.shutdown = function(id) {
             $scope.onSpin = id;
             Shutdown.get({ id: id}, function() {
                 $scope.onSpin = undefined;
+                $scope.reload();
             });
         };
 
@@ -253,39 +255,54 @@
             $scope.onSpin = id;
             Prepare.get({ id: id}, function() {
                 $scope.onSpin = undefined;
-
+                $scope.reload();
             });
         };
 
-        $scope.screenshot = function(machineId){
-            var toGet = '/machine/screenshot/'+machineId+'.json';
-            $http.get(toGet);
+        $scope.screenshot = function(id) {
+            $scope.onSpin = id;
+            Screenshot.get({ id: id}, function() {
+                $scope.onSpin = undefined;
+                $scope.reload();
+            });
         };
 
-        $scope.pause = function(machineId){
-            var toGet = '/machine/pause/'+machineId+'.json';
-            $http.get(toGet);
+        $scope.pause = function(id) {
+            $scope.onSpin = id;
+            Pause.get({ id: id}, function() {
+                $scope.onSpin = undefined;
+                $scope.reload();
+            });
         };
 
-        $scope.resume = function(machineId){
-            var toGet = '/machine/resume/'+machineId+'.json';
-            $http.get(toGet);
+        $scope.resume = function(id) {
+            $scope.onSpin = id;
+            Resume.get({ id: id}, function() {
+                $scope.onSpin = undefined;
+                $scope.reload();
+            });
         };
 
-        $scope.start = function(machineId){
-            var toGet = '/machine/start/'+machineId+'.json';
-            $http.get(toGet);
+        $scope.start = function(id) {
+            $scope.onSpin = id;
+            Start.get({ id: id}, function() {
+                $scope.onSpin = undefined;
+                $scope.reload();
+            });
         };
 
-        $scope.removeb = function(machineId){
-            var toGet = '/machine/remove_b/'+machineId+'.json';
-            $http.get(toGet);
+        $scope.removeb = function(id) {
+            $scope.onSpin = id;
+            RemoveB.get({ id: id}, function() {
+                $scope.onSpin = undefined;
+                $scope.reload();
+            });
         };
 
     };
 
 
-    function mainpageCrtl($scope, $http, request, listMach) {
+    function mainpageCrtl($scope, $http, listMach) {
 
         $url_list = "/list_bases.json";
         if ( typeof $_anonymous !== 'undefined' && $_anonymous ) {
@@ -295,10 +312,6 @@
                 $scope.list_bases= response.data;
         });
 
-        request.get(function( res ) {
-            $scope.res = res;
-        });
-
         $http.get('/pingbackend.json').then(function(response) {
             $scope.pingbe_fail = !response.data;
 
@@ -306,14 +319,10 @@
 
     };
 
-    function messagesCrtl($scope, $http, request) {
+    function messagesCrtl($scope, $http) {
 
         $http.get('/messages.json').then(function(response) {
                 $scope.list_message= response.data;
-        });
-
-        request.get(function( res ) {
-            $scope.res = res;
         });
 
         $scope.asRead = function(messId){
@@ -325,7 +334,7 @@
         });
     };
 
-    function usersCrtl($scope, $http, request, listUsers) {
+    function usersCrtl($scope, $http, listUsers) {
 
         $http.get('/list_users.json').then(function(response) {
                 $scope.list_users= response.data;
