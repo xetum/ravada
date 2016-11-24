@@ -9,13 +9,7 @@
             .directive("solShowMachinesNotifications", swMachNotif)
             .directive("solShowMessages", swMess)
 	        .service("listUsers", gtListUsers)
-            .service("Shutdown", svcShutdown)
-            .service("Prepare", svcPrepare)
-            .service("Screenshot", svcScreenshot)
-            .service("Pause", svcPause)
-            .service("Start", svcStart)
-            .service("Resume", svcResume)
-            .service("RemoveB", svcRemoveB)
+            .service("Machine", svcMachine)
             .service("PingBE", svcPingBE)
             .service("AsRead", svcAsRead)
             .service("ReadAll", svcReadAll)
@@ -106,32 +100,59 @@
 ////////////////////////////
 
 
-    function svcShutdown ( $resource ){
-        return $resource('/machine/shutdown/:id.json',{id:'@id'});
-    };
+    function svcMachine ( $resource ){
 
-    function svcScreenshot ( $resource ){
-        return $resource('/machine/screenshot/:id.json',{id:'@id'});
-    };
+        return $resource('/machine/:action/:id.json',{id:'@id',action:'@action'},{
+            shutdown: {
+                method:'GET',
+                params:{
+                    action:'shutdown'
+                }
+            },
 
-    function svcPrepare ( $resource ){
-        return $resource('/machine/prepare/:id.json',{id:'@id'});
-    };
+            screenshot: {
+                method:'GET',
+                params:{
+                    action:'screenshot'
+                }
+            },
 
-    function svcPause ( $resource ){
-        return $resource('/machine/pause/:id.json',{id:'@id'});
-    };
+            pause: {
+                method:'GET',
+                params:{
+                    action:'pause'
+                }
+            },
 
-    function svcResume ( $resource ){
-        return $resource('/machine/resume/:id.json',{id:'@id'});
-    };
+            resume: {
+                method:'GET',
+                params:{
+                    action:'resume'
+                }
+            },
 
-    function svcStart ( $resource ){
-        return $resource('/machine/start/:id.json',{id:'@id'});
-    };
+            start: {
+                method:'GET',
+                params:{
+                    action:'start'
+                }
+            },
 
-    function svcRemoveB ( $resource ){
-        return $resource('/machine/remove_b/:id.json',{id:'@id'});
+            prepare: {
+                method:'GET',
+                params:{
+                    action:'prepare'
+                }
+            },
+
+            removeb: {
+                method:'GET',
+                params:{
+                    action:'remove_b'
+                }
+            }
+
+        });
     };
 
     function svcAsRead ( $resource ){
@@ -223,19 +244,32 @@
 
     };*/
 
-    function machinesCtrl($scope, $http, Shutdown, Prepare, Screenshot, Pause, Resume, Start, RemoveB, PingBE, ListMach) {
+    function machinesCtrl($scope, $http, Machine, PingBE, ListMach) {
 
         
         //if ( typeof $_anonymous !== 'undefined' && $_anonymous ) {
         //    $url_list = "/list_bases_anonymous.json";
         //}
-                
+
+        function ChangeState(id, state) {
+            for (i=0; i < $scope.list_machines.length; i++) {
+                if ( $scope.list_machines[i].id == id ) {
+                    $scope.list_machines[i].is_active = state;
+                }
+            }
+        }
         $scope.reload = function() {
             if ( typeof $_anonymous !== 'undefined' && $_anonymous ) {
-                $scope.list_machines = ListMachA.get();
+                $scope.list_machines = ListMach.get();
             }
             else{
-                $scope.list_machines = ListMach.get();
+                $scope.list_machines = ListMach.get(function(data) {
+                    var spin = {};
+                    for(i=0; i < data.length; i++ ) {
+                        spin[data.id] = 0;
+                    }
+                    $scope.onSpin = spin;
+                });
             }
             
             $scope.pingbe_fail = PingBE.get();
@@ -244,59 +278,35 @@
         $scope.reload();
 
         $scope.shutdown = function(id) {
-            $scope.onSpin = id;
-            Shutdown.get({ id: id}, function() {
-                $scope.onSpin = undefined;
-                $scope.reload();
+            $scope.onSpin[id] = Machine.shutdown({ id: id}, function() {
+                ChangeState(id, 0);
             });
         };
 
         $scope.prepare = function(id) {
-            $scope.onSpin = id;
-            Prepare.get({ id: id}, function() {
-                $scope.onSpin = undefined;
-                $scope.reload();
-            });
+            Machine.prepare({ id: id});
         };
 
         $scope.screenshot = function(id) {
-            $scope.onSpin = id;
-            Screenshot.get({ id: id}, function() {
-                $scope.onSpin = undefined;
-                $scope.reload();
-            });
+            Machine.screenshot({ id: id});
         };
 
         $scope.pause = function(id) {
-            $scope.onSpin = id;
-            Pause.get({ id: id}, function() {
-                $scope.onSpin = undefined;
-                $scope.reload();
-            });
+            Machine.pause({ id: id});
         };
 
         $scope.resume = function(id) {
-            $scope.onSpin = id;
-            Resume.get({ id: id}, function() {
-                $scope.onSpin = undefined;
-                $scope.reload();
-            });
+            Machine.resume({ id: id});
         };
 
         $scope.start = function(id) {
-            $scope.onSpin = id;
-            Start.get({ id: id}, function() {
-                $scope.onSpin = undefined;
-                $scope.reload();
+            Machine.prepare({ id: id}, function() {
+                ChangeState(id, 1);
             });
         };
 
         $scope.removeb = function(id) {
-            $scope.onSpin = id;
-            RemoveB.get({ id: id}, function() {
-                $scope.onSpin = undefined;
-                $scope.reload();
-            });
+            Machine.removeb({ id: id});
         };
 
     };

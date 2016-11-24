@@ -810,6 +810,8 @@ sub shutdown_machine {
     my ($domain, $type) = _search_requested_machine($c);
     my $req = Ravada::Request->shutdown_domain(name => $domain->name, uid => $USER->id);
 
+    
+
     return $c->redirect_to('/machines') if $type eq 'html';
     return $c->render(json => { req => $req->id });
 }

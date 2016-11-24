@@ -11,7 +11,7 @@
 
         <!--MACHINES SELECTION-->
         <div class="page-header" ng-controller="bases">
-        <div ng-show="pingbe_fail" class="alert alert-danger" ng-cloak>
+        <div ng-show="!pingbe_fail" class="alert alert-danger" ng-cloak>
           <strong>Error!</strong> Backend no available!
         </div>
         <div class="row">

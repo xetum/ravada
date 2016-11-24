@@ -75,7 +75,7 @@ sub _request {
 
 =head2 open
 
-Opens the information of a previous request by id
+Opens the information of a previous request by 
 
   my $req = Ravada::Request->open($id);
 
