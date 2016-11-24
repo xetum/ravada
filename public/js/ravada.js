@@ -300,7 +300,7 @@
         };
 
         $scope.start = function(id) {
-            Machine.prepare({ id: id}, function() {
+            Machine.start({ id: id}, function() {
                 ChangeState(id, 1);
             });
         };
