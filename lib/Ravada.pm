@@ -278,6 +278,7 @@ sub remove_domain {
 
     my $user = Ravada::Auth::SQL->search_by_id( $arg{uid});
     $domain->remove( $user);
+
 }
 
 =head2 search_domain
@@ -663,8 +664,11 @@ sub _cmd_screenshot {
         $bytes = $domain->screenshot($request->args('filename'))    if !$bytes;
     }
     $request->error("No data received") if !$bytes;
-    $request->status('done');
-
+        my $msg = 'Domain '
+            .$domain->name
+            .' screenshot done.'
+            ;
+    $request->status('done',$msg);
 }
 
 
@@ -771,7 +775,11 @@ sub _cmd_remove {
         if !defined $request->args->{uid};
 
     $self->remove_domain(name => $request->args('name'), uid => $request->args('uid'));
-
+    my $msg = 'Domain '
+            .$request->args('name')
+            .' removed.'
+            ;
+    $request->status('done',$msg);
 }
 
 sub _cmd_pause {
@@ -787,8 +795,11 @@ sub _cmd_pause {
     my $user = Ravada::Auth::SQL->search_by_id($uid);
 
     $domain->pause($user);
-
-    $request->status('done');
+    my $msg = 'Domain '
+            .$domain->name
+            .' paused.'
+            ;
+    $request->status('done',$msg);
 
 }
 
@@ -805,8 +816,11 @@ sub _cmd_resume {
     my $user = Ravada::Auth::SQL->search_by_id($uid);
 
     $domain->resume($user);
-
-    $request->status('done');
+    my $msg = 'Domain '
+            .$domain->name
+            .' resumed.'
+            ;
+    $request->status('done',$msg);
 
 }
 
@@ -849,7 +863,11 @@ sub _cmd_prepare_base {
     die "Unknown domain id '$id_domain'\n" if !$domain;
 
     $domain->prepare_base($user);
-
+        my $msg = 'Prepare base on domain '
+            .$domain->name
+            .' done.'
+            ;
+    $request->status('done',$msg);
 }
 
 sub _cmd_remove_base {
@@ -867,7 +885,11 @@ sub _cmd_remove_base {
     die "Unknown domain id '$id_domain'\n" if !$domain;
 
     $domain->remove_base($user);
-
+    my $msg = 'Domain'
+            .$domain->name
+            .' base removed.'
+            ;
+    $request->status('done',$msg);
 }
 
 
@@ -889,7 +911,11 @@ sub _cmd_shutdown {
 
     $domain->shutdown(timeout => $timeout, name => $name, user => $user
                     , request => $request);
-
+    my $msg = 'Domain '
+            .$domain->name
+            .' shutdown.'
+            ;
+    $request->status('done',$msg);
 }
 
 sub _cmd_list_vm_types {

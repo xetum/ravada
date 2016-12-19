@@ -9,6 +9,7 @@ use JSON::XS;
 use Hash::Util;
 use Ravada;
 use Ravada::Front;
+use AnyEvent::MQTT;
 
 use vars qw($AUTOLOAD);
 
@@ -266,7 +267,7 @@ sub shutdown_domain {
 
     my $self = {};
     bless($self,$class);
-
+    
     return $self->_new_request(command => 'shutdown' , args => encode_json($args));
 }
 
@@ -289,7 +290,7 @@ sub prepare_base {
 
     my $self = {};
     bless($self,$class);
-
+    
     return $self->_new_request(command => 'prepare_base'
         , id_domain => $args{id_domain}
         , args => encode_json( $args ));
@@ -319,7 +320,7 @@ sub remove_base {
 
     my $self = {};
     bless($self,$class);
-
+    
     return $self->_new_request(command => 'remove_base'
         , id_domain => $args{id_domain}
         , args => encode_json( $args ));
@@ -467,6 +468,16 @@ sub _send_message {
     my $status = shift;
     my $message = ( shift or $self->error );
 
+    $self->_send_message_db($status,$message);
+    $self->_send_message_mqtt($status,$message);
+
+}
+
+sub _send_message_db {
+    my $self = shift;
+    my $status = shift;
+    my $message = ( shift or $self->error );
+
     my $uid;
 
     eval { $uid = $self->args('id_owner') };
@@ -484,9 +495,41 @@ sub _send_message {
         "INSERT INTO messages ( id_user, id_request, subject, message ) "
         ." VALUES ( ?,?,?,?)"
     );
+
     $sth->execute($uid, $self->id,"Command ".$self->command." $domain_name".$self->status
         ,$message);
     $sth->finish;
+
+
+}
+
+sub _send_message_mqtt {
+    my $self = shift;
+    my $status = shift;
+    my $message = ( shift or $self->error );
+
+    my $uid;
+
+    eval { $uid = $self->args('id_owner') };
+    eval { $uid = $self->args('uid') }  if !$uid;
+    return if !$uid;
+
+    my $domain_name;
+    eval { $domain_name = $self->args('name') };
+    $domain_name = ''               if !$domain_name;
+    $domain_name = "$domain_name "  if length $domain_name;
+
+    $self->_remove_unnecessary_messages() if $self->status eq 'done';
+
+    my $mqtt = AnyEvent::MQTT->new(host=>'127.0.0.1');
+
+    my $cv = $mqtt->subscribe(topic => "/rvd/$uid",
+                                callback => sub {
+                                my ($uid, $message) = @_;
+    });
+
+    $cv = $mqtt->publish(message => "$message", topic => "/rvd/$uid");
+    $cv->recv;
 }
 
 sub _remove_unnecessary_messages {
