@@ -4,7 +4,7 @@ Remove Virtual Desktops Manager
 
 Broker: ravada
 
-Hypervisors: [KVM](http://www.linux-kvm.org/) - [LXC](https://linuxcontainers.org/)
+Hypervisors: [KVM](http://www.linux-kvm.org/) - [LXC](https://linuxcontainers.org/) - [Docker](https://www.docker.com/docker-community)
 
 Remote Access: [Spice](http://www.spice-space.org/)
 
