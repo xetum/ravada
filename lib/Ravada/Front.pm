@@ -34,7 +34,7 @@ has 'fork' => (
 
 our $CONNECTOR;# = \$Ravada::CONNECTOR;
 our $TIMEOUT = 5;
-our @VM_TYPES = ('KVM');
+our @VM_TYPES = ('KVM','docker');
 
 our %VM;
 our $PID_FILE_BACKEND = '/var/run/rvd_back.pl.pid';
