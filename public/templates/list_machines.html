@@ -96,7 +96,7 @@
                         <div ng-show="{{machine.has_clones}}">Remove clones to allow rebase.</div>
                     </div>
                     <br>
-                    <input type="submit">
+                     <input type="submit">
                   </form>
               </div>
             </div>
@@ -174,7 +174,14 @@
                 </div>
 
 
+                <label for "display">Display {{machine.display}}</label>
+                <select ng-model="display_new[machine.id]"
+                        ng-change="change_display(machine.id)">
+                    <option value="SPICE" ng-selected="machine.display=='SPICE'">SPICE</option>
+                    <option value="X2Go" ng-selected="machine.display=='X2Go'">X2Go</option>
 
+                </select>
+                </br/>
 
               </div>
               <div class="modal-footer">
