@@ -76,7 +76,6 @@
             // why this line does nothing ?
             new_name: 'new_name'
         };
-        $scope.display_new={};
 
         $scope.show_rename = false;
         $scope.new_name_duplicated=false;
@@ -167,9 +166,6 @@
             $http.get("/machine/public/"+machineId+"/"+value);
         };
 
-        $scope.change_display = function(machineId) {
-            $http.get("/machine/display/"+machineId+"/"+$scope.display_new[machineId]));
-        };
     };
 
     // list machines

@@ -335,6 +335,11 @@ get '/machine/rename/*' => sub {
     return rename_machine($c);
 };
 
+get '/machine/set_x2go/*' => sub {
+    my $c = shift;
+    return set_x2go($c);
+};
+
 any '/machine/copy' => sub {
     my $c = shift;
     return copy_machine($c);
@@ -1156,9 +1161,35 @@ sub machine_is_public {
     return $c->render(json => $domain->is_public);
 }
 
+sub set_x2go {
+    my $c = shift;
+
+    my $uri = $c->req->url->to_abs->path;
+
+    my ($id_domain,$value)
+       = $uri =~ m{^/machine/\w+/(\d+)/(.*)};
+
+    return $c->render(data => "Machine id not found in $uri ")
+        if !$id_domain;
+
+    my $domain = $RAVADA->search_domain_by_id($id_domain);
+
+    return access_denied($c)
+        unless $USER->is_admin 
+            || $USER->id == $domain->id_owner;
+
+    if ($value =~ /false/) {
+        $value = 0;
+    } else {
+        $value = 1;
+    }
+    $domain->set_x2go($value);
+    return $c->render(json => $value );
+
+}
+
 sub rename_machine {
     my $c = shift;
-    return login($c) if !_logged_in($c);
     return access_denied($c)    if !$USER->is_admin();
 
     my $uri = $c->req->url->to_abs->path;

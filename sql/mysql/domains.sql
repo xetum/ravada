@@ -9,7 +9,6 @@ CREATE TABLE `domains` (
   `is_public` int(1) NOT NULL DEFAULT '0',
   `file_base_img` varchar(255) DEFAULT NULL,
   `file_screenshot` varchar(255) DEFAULT NULL,
-  `display` enum('SPICE','x2go') DEFAULT 'SPICE',
   `port` int(5),
   `id_owner` int(11),
   `vm` char(120) NOT NULL,
