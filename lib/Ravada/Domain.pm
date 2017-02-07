@@ -111,6 +111,7 @@ before 'resume' => \&_allow_manage;
 
 before 'shutdown' => \&_allow_manage_args;
 after 'shutdown' => \&_post_shutdown;
+after 'shutdown_now' => \&_post_shutdown;
 
 before 'remove_base' => \&_can_remove_base;
 after 'remove_base' => \&_post_remove_base;
@@ -749,13 +750,12 @@ sub _post_shutdown {
 
     $self->_remove_temporary_machine(@_);
     $self->_remove_iptables(@_);
+    $self->_close_nat_ports(@_);
 
 }
 
 sub _remove_iptables {
     my $self = shift;
-
-    my $args = {@_};
 
     my $ipt_obj = _obj_iptables();
 
@@ -763,9 +763,10 @@ sub _remove_iptables {
         "UPDATE iptables SET time_deleted=?"
         ." WHERE id=?"
     );
-    for my $row ($self->_active_iptables($args->{user})) {
+    for my $row ($self->_active_iptables()) {
         my ($id, $iptables) = @$row;
         $ipt_obj->delete_ip_rule(@$iptables);
+#        warn "Removing iptable ".Dumper($iptables);
         $sth->execute(Ravada::Utils::now(), $id);
     }
 }
@@ -773,7 +774,7 @@ sub _remove_iptables {
 sub _remove_temporary_machine {
     my $self = shift;
 
-    my %args = @_;
+    my %args = @_ if !scalar @_ % 2;
     my $user;
 
     return if !$self->is_known();
@@ -783,7 +784,9 @@ sub _remove_temporary_machine {
 
     if ($user->is_temporary) {
         $self->remove($user);
-        my $req= $args{request};
+
+        my $req= $args{request} or next;
+
         $req->status(
             "removing"
             ,"Removing domain ".$self->name." after shutdown"
@@ -800,7 +803,68 @@ sub _post_resume {
 sub _post_start {
     my $self = shift;
 
-    $self->_add_iptable(@_);
+    $self->_add_iptable_display(@_);
+    $self->_open_nat_ports(@_);
+}
+
+sub _open_nat_ports {
+    my $self = shift;
+    return if scalar @_ % 2;
+
+    my %args = @_;
+
+    my $remote_ip = $args{remote_ip}
+        or confess "Missing remote_ip";
+
+    my $query = "SELECT name,port FROM base_ports WHERE (id_domain=?";
+    $query .=" OR id_base=?" if $self->id_base;
+    $query .= ")";
+
+    my $sth = $$CONNECTOR->dbh->prepare($query);
+
+    my @query_args = ($self->id);
+    push @query_args,($self->id_base) if $self->id_base;
+
+    $sth->execute($self->id);
+    my $display = $self->display($args{user});
+    my ($local_ip) = $display =~ m{\w+://(.*):\d+};
+
+    my $sth_insert = $$CONNECTOR->dbh->prepare(
+        "INSERT INTO domain_ports "
+        ." (id_domain, public_ip, public_port, internal_ip,internal_port, name)"
+        ." VALUES(?,?,?,?,?,?)"
+    );
+    while ( my ($name,$port) = $sth->fetchrow) {
+        my $public_port = _new_free_port();
+        $self->_add_iptable(@_, local_ip => $local_ip, local_port => $public_port);
+        $sth_insert->execute($self->id, $local_ip, $public_port, $local_ip, $port, $name)
+    }
+    $sth->finish;
+
+}
+
+sub _new_free_port {
+    return 5800;
+}
+
+sub _close_nat_ports {
+    my $self = shift;
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "DELETE FROM domain_ports WHERE id_domain=?"
+    );
+    $sth->execute($self->id);
+    $sth->finish;
+}
+
+sub _add_iptable_display {
+    my $self = shift;
+    return if scalar @_ % 2;
+    my %args = @_;
+
+    my $display = $self->display($args{user});
+    my ($local_ip, $local_port) = $display =~ m{\w+://(.*):(\d+)};
+    return $self->_add_iptable(@_,local_ip => $local_ip, local_port => $local_port);
 }
 
 sub _add_iptable {
@@ -808,13 +872,13 @@ sub _add_iptable {
     return if scalar @_ % 2;
     my %args = @_;
 
-    my $remote_ip = $args{remote_ip} or return;
+    my $remote_ip = $args{remote_ip} or confess "Mising remote_ip";
 
     my $user = $args{user};
     my $uid = $user->id;
 
-    my $display = $self->display($user);
-    my ($local_ip, $local_port) = $display =~ m{\w+://(.*):(\d+)};
+    my $local_ip = $args{local_ip} or confess "Missing arg{local_ip}";
+    my $local_port = $args{local_port} or confess "Missing arg{local_port}";
 
     my $ipt_obj = _obj_iptables();
 	# append rule at the end of the RAVADA chain in the filter table to
@@ -859,7 +923,7 @@ sub open_iptables {
     my $user = Ravada::Auth::SQL->search_by_id($args{uid});
     $args{user} = $user;
     delete $args{uid};
-    $self->_add_iptable(%args);
+    $self->_add_iptable_display(%args);
 }
 
 sub _obj_iptables {
@@ -932,17 +996,15 @@ sub _log_iptable {
 
 sub _active_iptables {
     my $self = shift;
-    my $user = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
         "SELECT id,iptables FROM iptables "
         ." WHERE "
         ."    id_domain=?"
-        ."    AND id_user=? "
         ."    AND time_deleted IS NULL"
         ." ORDER BY time_req DESC "
     );
-    $sth->execute($self->id, $user->id);
+    $sth->execute($self->id);
     my @iptables;
     while (my ($id, $iptables) = $sth->fetchrow) {
         push @iptables, [ $id, decode_json($iptables)];
@@ -1029,4 +1091,57 @@ sub _post_rename {
      $sth->finish;
  }
 
+=head2 add_nat
+
+Makes the domain do nat to a private port. All its clones will do nat to this port too.
+To know what is the public ip and port the method public_address($port) must be called.
+
+Arguments: port
+
+    $domain->add_nat(22);
+
+    print "Public ip:port for 22 is ".join(":", $domain->public_address(22))."\n";
+
+=cut
+
+sub add_nat{
+    my $self = shift;
+    my $port = shift;
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "INSERT INTO base_ports (id_domain, port)"
+        ." VALUES (?,?)"
+    );
+    $sth->execute($self->id, $port);
+    $sth->finish;
+}
+
+
+=head2 public_address
+
+Returns the public address for a service in the Virtual Machine.
+
+Argument: port
+
+Returns: public_ip , public_port
+
+    my $private_port = 22;
+    my ($public_ip, $public_port) = $domain->public_address($private_port);
+
+=cut
+
+
+sub public_address {
+    my $self = shift;
+    my $port = shift;
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "SELECT public_ip,public_port "
+        ." FROM domain_ports "
+        ." WHERE internal_port=?"
+        ."    AND id_domain=?"
+    );
+    $sth->execute($port, $self->id);
+    return $sth->fetchrow;
+}
 1;
