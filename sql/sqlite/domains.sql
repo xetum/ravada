@@ -9,10 +9,11 @@ CREATE TABLE `domains` (
 ,  `is_public` integer NOT NULL DEFAULT '0'
 ,  `file_base_img` varchar(255) DEFAULT NULL
 ,  `file_screenshot` varchar(255) DEFAULT NULL
-,  `display` text  DEFAULT 'SPICE'
 ,  `port` integer
 ,  `id_owner` integer
 ,  `vm` char(120) NOT NULL
+,  `has_spice` integer default 1
+,  `has_x2go` integer default 0
 ,  UNIQUE (`id_base`,`name`)
 ,  UNIQUE (`name`)
 );
