@@ -156,6 +156,45 @@ sub flush_rules {
     $ipt->flush_chain('filter', $CHAIN);
     $ipt->delete_chain('filter', 'INPUT', $CHAIN);
 }
+
+sub test_fw_ssh {
+    my $vm_name = shift;
+    my $domain = shift;
+
+    my $port = 22;
+    my $remote_ip = '11.22.33.44';
+
+    $domain->add_nat($port);
+
+    $domain->shutdown_now($USER) if $domain->is_active;
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+
+    ok($domain->is_active,"Domain ".$domain->name." should be active=1, got: "
+        .$domain->is_active) or return;
+
+    my ($public_ip,$public_port)= $domain->public_address($port);
+
+    diag("Open in $public_ip / $public_port");
+    like($public_ip,qr{^\d+\.\d+\.\d+\.\d+$});
+    like($public_port, qr{^\d+$});
+
+    #comprova que està obert a les iptables per aquest port desde la $remote_ip
+    my $vm = $RVD_BACK->search_vm($vm_name);
+    my $local_ip = $vm->ip;
+
+    is($public_ip,$local_ip);
+    test_chain($vm_name, $local_ip, $public_port, $remote_ip,1);
+
+    $domain->shutdown_now($USER) if $domain->is_active;
+    {
+        my ($ip,$port)= $domain->public_address($port);
+
+        like($ip,qr{^$});
+        like($port,qr{^$});
+    }
+    test_chain($vm_name, $local_ip, $public_port, $remote_ip,0);
+
+}
 #######################################################
 
 remove_old_domains();
@@ -188,6 +227,9 @@ for my $vm_name (qw( Void KVM )) {
 
         my $domain2 = test_create_domain($vm_name);
         test_fw_domain_stored($vm_name, $domain2->name);
+
+        my $domain3 = test_create_domain($vm_name);
+        test_fw_ssh($vm_name, $domain3);
     };
 }
 flush_rules();
