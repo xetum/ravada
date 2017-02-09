@@ -155,19 +155,23 @@ sub test_chain {
 sub test_chain_prerouting {
     my $vm_name = shift;
 
-    my ($local_ip,$port, $enabled) = @_;
+    my ($local_ip,$port, $domain_ip, $enabled) = @_;
     my $ipt = IPTables::Parse->new();
 
     my @rule_num;
     for my $rule (@{$ipt->chain_rules('nat','PREROUTING')}) {
         lock_hash(%$rule);
-        push @rule_num,($rule->{rule_num})
+        push @rule_num,([$rule->{rule_num},$rule->{extended}])
             if $rule->{dst} eq $local_ip
-                && $rule->{to_port} eq $port;
+                && $rule->{to_port} eq $port
+                && $rule->{dst} eq $domain_ip
     }
 
-    ok($rule_num[0],"[$vm_name] Expecting rule for dst: $local_ip to_port: $port") 
-        if $enabled;
+    ok(scalar @rule_num == 1
+        ,"[$vm_name] Expecting 1 rule for dst: $local_ip to_port: $port"
+            ." got :".scalar @rule_num
+    ) 
+            if $enabled;
     ok(!scalar @rule_num,"[$vm_name] Expecting no rule for $local_ip: $port"
                         .", got ".Dumper(\@rule_num) )
         if !$enabled;
@@ -206,7 +210,21 @@ sub test_fw_ssh {
     my $local_ip = $vm->ip;
 
     is($public_ip,$local_ip);
+    my $domain_ip = $domain->ip;
+    for ( 1 .. 10 ) {
+        $domain_ip = $domain->ip;
+        last if  $domain_ip;
+        sleep 1;
+    }
+    die "No domain ip for ".$domain->name   if !$domain_ip;
+
     test_chain($vm_name, $local_ip, $public_port, $remote_ip,1);
+    test_chain_prerouting($vm_name, $local_ip, $port, $domain_ip, 1);
+
+    eval {
+        $domain->open_nat_ports( remote_ip => $remote_ip, user => $USER);
+    };
+    like($@,qr{UNIQUE});
     test_chain_prerouting($vm_name, $local_ip, $port, 1);
 
     $domain->shutdown_now($USER) if $domain->is_active;
@@ -217,7 +235,7 @@ sub test_fw_ssh {
         like($port,qr{^$});
     }
     test_chain($vm_name, $local_ip, $public_port, $remote_ip,0);
-    test_chain_prerouting($vm_name, $local_ip, $port, 0);
+    test_chain_prerouting($vm_name, $local_ip, $port, $domain_ip, 0);
 
 }
 #######################################################
