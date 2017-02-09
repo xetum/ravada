@@ -926,4 +926,16 @@ sub _set_spice_ip {
     }
 }
 
+sub ip {
+    my $self = shift;
+    my @nics = $self->domain
+        ->get_interface_addresses( Sys::Virt::Domain::INTERFACE_ADDRESSES_SRC_LEASE );
+
+    if (!@nics) {
+        my @ifs = $self->_vm->vm->list_all_interfaces;
+        warn Dumper(@ifs);
+    }
+    warn Dumper(@nics);
+    return $nics[0]->{addrs}->{addr};
+}
 1;

@@ -19,6 +19,12 @@ has 'domain' => (
     ,required => 1
 );
 
+has '_ip' => (
+    is => 'rw'
+    ,isa => 'Str'
+    ,default => sub { return '192.168.122.'.int rand(255)}
+);
+
 our $DIR_TMP = "/var/tmp/rvd_void";
 
 #######################################3
@@ -333,5 +339,10 @@ sub disk_size {
 
 sub spinoff_volumes {
     return;
+}
+
+sub ip {
+    my $self = shift;
+    return $self->_ip;
 }
 1;
