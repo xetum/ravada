@@ -7,6 +7,7 @@ use Carp qw(carp confess croak cluck);
 use Data::Dumper;
 use Hash::Util qw(lock_hash);
 use Image::Magick;
+use IPC::Run3;
 use JSON::XS;
 use Moose::Role;
 use Sys::Statistics::Linux;
@@ -51,6 +52,8 @@ requires 'spinoff_volumes';
 requires 'get_info';
 requires 'set_memory';
 requires 'set_max_mem';
+
+requires 'ip';
 ##########################################################
 
 has 'domain' => (
@@ -828,6 +831,7 @@ sub _open_nat_ports {
     $sth->execute($self->id);
     my $display = $self->display($args{user});
     my ($local_ip) = $display =~ m{\w+://(.*):\d+};
+    my $domain_ip = $self->ip;
 
     my $sth_insert = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports "
@@ -836,12 +840,59 @@ sub _open_nat_ports {
     );
     while ( my ($name,$port) = $sth->fetchrow) {
         my $public_port = _new_free_port();
+#        warn "NAT $local_ip:$public_port -> $domain_ip:$port";
         $self->_add_iptable(@_, local_ip => $local_ip, local_port => $public_port);
+        $self->_add_iptable_nat(@_
+            ,local_ip => $local_ip,          local_port => $public_port
+            ,domain_ip => $domain_ip, domain_port => $port
+
+        );
+
         $sth_insert->execute($self->id, $local_ip, $public_port, $local_ip, $port, $name)
     }
     $sth->finish;
 
 }
+sub _add_iptable_nat {
+    my $self = shift;
+    my %args = @_;
+
+    #iptables -t nat -I PREROUTING -p tcp -d public_ip --dport 1111 -j DNAT --to-destination private_ip:443
+    my $remote_ip = $args{remote_ip} or confess "Mising remote_ip";
+    my $local_ip = $args{local_ip} or confess "Mising local_ip";
+    my $local_port = $args{local_port} or confess "Mising local_port";
+    my $domain_ip = $args{domain_ip}    or confess "Missing domain_ip";
+    my $domain_port = $args{domain_port}    or confess "Missing domain_port";
+
+    my $ipt_obj = _obj_iptables();
+    my @iptables_arg = ( 
+#        $remote_ip, $local_ip
+        '0.0.0.0/0', $local_ip 
+        ,'nat', 'PREROUTING', 'DNAT'
+        ,{  protocol => 'tcp'
+            ,d_port => $local_port
+            ,to_ip => $domain_ip
+            ,to_port => $domain_port
+        }
+    );
+#    warn Dumper(\@iptables_arg);
+#    my ($rv, $out_ar, $errs_ar) = $ipt_obj->append_ip_rule(@iptables_arg);
+#    die join("\n",@$errs_ar) if $errs_ar->[0];
+    my @cmd = ('iptables','-t','nat','-I','PREROUTING'
+        ,'-p','tcp'
+        ,'-d',$local_ip
+        ,'--dport',$local_port
+        ,'-j','DNAT'
+        ,'--to-destination',"$domain_ip:$domain_port"
+    );
+    my ($in,$out,$err);
+    run3(\@cmd, \$in, \$out, \$err);
+    warn $out if $out;
+    die $err if $err;
+    $self->_log_iptable(iptables => \@iptables_arg, %args);
+
+}
+
 
 sub _new_free_port {
     return 5800;
@@ -901,6 +952,8 @@ sub _add_iptable {
     $self->_log_iptable(iptables => \@iptables_arg, %args);
 
 }
+
+
 
 =head2 open_iptables
 
