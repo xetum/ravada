@@ -807,10 +807,17 @@ sub _post_start {
     my $self = shift;
 
     $self->_add_iptable_display(@_);
-    $self->_open_nat_ports(@_);
+    $self->open_nat_ports(@_);
 }
 
-sub _open_nat_ports {
+=head2 open_nat_ports
+
+Adds iptables rules to open the NAT port for the domain
+
+Returns the number of open ports.
+=cut
+
+sub open_nat_ports {
     my $self = shift;
     return if scalar @_ % 2;
 
@@ -837,6 +844,7 @@ sub _open_nat_ports {
         return;
     }
 
+    my $n_open = 0;
     my $sth_insert = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports "
         ." (id_domain, public_ip, public_port, internal_ip,internal_port, name)"
@@ -852,11 +860,16 @@ sub _open_nat_ports {
 
         );
 
-        $sth_insert->execute($self->id, $local_ip, $public_port, $local_ip, $port, $name)
+        $sth_insert->execute($self->id
+            , $local_ip, $public_port
+            , $domain_ip, $port
+            , $name)
+        $n_open++;
     }
     $sth->finish;
-
+    return $n_open;
 }
+
 sub _add_iptable_nat {
     my $self = shift;
     my %args = @_;
