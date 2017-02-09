@@ -926,16 +926,40 @@ sub _set_spice_ip {
     }
 }
 
+sub _hwaddr {
+    my $self = shift;
+
+    my $doc = XML::LibXML->load_xml(string => $self->domain->get_xml_description);
+
+    my @hwaddr;
+    for my $mac( $doc->findnodes("/domain/devices/interface/mac")) {
+        push @hwaddr,($mac->getAttribute('address'));
+    }
+    return @hwaddr;
+}
+
 sub ip {
     my $self = shift;
     my @nics = $self->domain
-        ->get_interface_addresses( Sys::Virt::Domain::INTERFACE_ADDRESSES_SRC_LEASE );
+        ->get_interface_addresses( 
+            Sys::Virt::Domain::INTERFACE_ADDRESSES_SRC_LEASE );
 
-    if (!@nics) {
-        my @ifs = $self->_vm->vm->list_all_interfaces;
-        warn Dumper(@ifs);
-    }
-    warn Dumper(@nics);
-    return $nics[0]->{addrs}->{addr};
+    return if !@nics;
+    return $nics[0]->{addrs}->[0]->{addr};
+
+#    search the leases tables, we may need it some day
+#    for my $mac ($self->_hwaddr) {
+#        warn $mac;
+#        for my $network ($self->_vm->vm->list_all_networks) {
+#            warn $network->get_name();
+#            my @leases = $network->get_dhcp_leases($mac);
+#            warn Dumper(\@leases);
+#            return $leases[0]->{ipaddr} if @leases;
+#
+#            @leases = $network->get_dhcp_leases();
+#            warn Dumper(\@leases);
+#        }
+#    }
+    return;
 }
 1;

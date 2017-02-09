@@ -832,6 +832,10 @@ sub _open_nat_ports {
     my $display = $self->display($args{user});
     my ($local_ip) = $display =~ m{\w+://(.*):\d+};
     my $domain_ip = $self->ip;
+    if ( !$domain_ip ) {
+        warn "No domain ip";
+        return;
+    }
 
     my $sth_insert = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports "
