@@ -6,7 +6,7 @@ CREATE TABLE `domain_ports` (
   `public_ip` varchar(255),
   `internal_ip` varchar(255),
   `name` varchar(32),
-  `description` varchar(255)
+  `description` varchar(255),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `id_domain` (`id_domain`),
+  UNIQUE KEY `id_domain` (`id_domain`)
 );
