@@ -3,6 +3,7 @@ use strict;
 
 use Data::Dumper;
 use JSON::XS;
+use Hash::Util qw(lock_hash);
 use Test::More;
 use Test::SQL::Data;
 use IPTables::ChainMgr;
@@ -151,6 +152,28 @@ sub test_chain {
 
 }
 
+sub test_chain_prerouting {
+    my $vm_name = shift;
+
+    my ($local_ip,$port, $enabled) = @_;
+    my $ipt = IPTables::Parse->new();
+
+    my @rule_num;
+    for my $rule (@{$ipt->chain_rules('nat','PREROUTING')}) {
+        lock_hash(%$rule);
+        push @rule_num,($rule->{rule_num})
+            if $rule->{dst} eq $local_ip
+                && $rule->{to_port} eq $port;
+    }
+
+    ok($rule_num[0],"[$vm_name] Expecting rule for dst: $local_ip to_port: $port") 
+        if $enabled;
+    ok(!scalar @rule_num,"[$vm_name] Expecting no rule for $local_ip: $port"
+                        .", got ".Dumper(\@rule_num) )
+        if !$enabled;
+
+}
+
 sub flush_rules {
     my $ipt = open_ipt();
     $ipt->flush_chain('filter', $CHAIN);
@@ -184,6 +207,7 @@ sub test_fw_ssh {
 
     is($public_ip,$local_ip);
     test_chain($vm_name, $local_ip, $public_port, $remote_ip,1);
+    test_chain_prerouting($vm_name, $local_ip, $port, 1);
 
     $domain->shutdown_now($USER) if $domain->is_active;
     {
@@ -193,6 +217,7 @@ sub test_fw_ssh {
         like($port,qr{^$});
     }
     test_chain($vm_name, $local_ip, $public_port, $remote_ip,0);
+    test_chain_prerouting($vm_name, $local_ip, $port, 0);
 
 }
 #######################################################
