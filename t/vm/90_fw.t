@@ -199,6 +199,13 @@ sub test_fw_ssh {
     ok($domain->is_active,"Domain ".$domain->name." should be active=1, got: "
         .$domain->is_active) or return;
 
+    for my $n ( 1 .. 60 ) {
+        last if $domain->ip;
+        diag("Waiting for ".$domain->name." to have an ip") if !($n % 10);
+        sleep 1;
+    }
+    ok($domain->ip,"Expecting an IP for the domain ".$domain->name) or return;
+
     my ($public_ip,$public_port)= $domain->public_address($port);
 
     diag("Open in $public_ip / $public_port");
