@@ -111,6 +111,51 @@ sub test_fw_domain{
 
 }
 
+sub test_fw_domain_nat{
+    my ($vm_name, $domain_name) = @_;
+    my $remote_ip = '99.88.77.66';
+
+    my $domain_port = 22;
+    my ($local_ip, $domain_ip);
+    my $id_domain;
+    {
+        my $vm = rvd_back->search_vm($vm_name);
+        my $domain = $vm->search_domain($domain_name);
+        $id_domain = $domain->id;
+        $domain->nat if !$domain->is_active;
+        $domain->add_nat($domain_port);
+        $local_ip = $vm->ip;
+        for (;;) {
+            $domain_ip = $domain->ip;
+            last if $domain_ip;
+            sleep 1;
+        }
+        ok($domain_ip,"Expecting a domain IP") or return;
+    }
+    test_chain_prerouting($vm_name, $local_ip, $domain_port, $domain_ip, 0);
+    {
+        my $req = Ravada::Request->nat_ports(
+            uid => $USER->id
+            , id_domain => $id_domain
+            , remote_ip => $remote_ip
+        );
+        ok($req);
+        rvd_back->process_requests();
+        wait_request($req);
+
+        is($req->status,'done');
+        is($req->error,'');
+    }
+    test_chain_prerouting($vm_name, $local_ip, $domain_port, $domain_ip, 1);
+    {
+        my $vm = rvd_back->search_vm($vm_name);
+        my $domain = $vm->search_domain($domain_name);
+        $domain->shutdown_now();
+    }
+    test_chain_prerouting($vm_name, $local_ip, $domain_port, $domain_ip, 0);
+
+}
+    
 sub test_fw_domain_pause {
     my ($vm_name, $domain_name) = @_;
     my $remote_ip = '99.88.77.66';
@@ -159,7 +204,6 @@ sub test_fw_domain_pause {
             ,"Expecting no new messages ");
     }
 }
-
 
 sub open_ipt {
     my %opts = (
@@ -250,6 +294,7 @@ for my $vm_name (qw( Void KVM )) {
         test_fw_domain($vm_name, $domain_name);
         test_fw_domain_pause($vm_name, $domain_name);
 
+        test_fw_domain_nat($vm_name, $domain_name);
     };
 }
 flush_rules();
