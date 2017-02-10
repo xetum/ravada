@@ -850,19 +850,27 @@ sub open_nat_ports {
         ." (id_domain, public_ip, public_port, internal_ip,internal_port, name)"
         ." VALUES(?,?,?,?,?,?)"
     );
-    while ( my ($name,$port) = $sth->fetchrow) {
-        my $public_port = _new_free_port();
-#        warn "NAT $local_ip:$public_port -> $domain_ip:$port";
+    while ( my ($name,$domain_port) = $sth->fetchrow) {
+        my %args_nat =(
+            local_ip => $local_ip
+            ,domain_ip => $domain_ip, domain_port => $domain_port
+        );
+        if ($self->_is_nat_port_open(%args_nat)) {
+            warn "Domain.pm : NAT ports already open $domain_ip:$domain_port\n";
+            next;
+        }
+
+        my $public_port = $self->_new_free_port();
+        warn "NAT $local_ip:$public_port -> $domain_ip:$domain_port";
         $self->_add_iptable(@_, local_ip => $local_ip, local_port => $public_port);
         $self->_add_iptable_nat(@_
-            ,local_ip => $local_ip,          local_port => $public_port
-            ,domain_ip => $domain_ip, domain_port => $port
-
+            ,%args_nat
+            ,local_port => $public_port
         );
 
         $sth_insert->execute($self->id
-            , $local_ip, $public_port
-            , $domain_ip, $port
+             , $local_ip, $public_port
+            , $domain_ip, $domain_port
             , $name);
         $n_open++;
     }
@@ -870,9 +878,27 @@ sub open_nat_ports {
     return $n_open;
 }
 
+sub _is_nat_port_open {
+    my $self = shift;
+    my %arg = @_;
+
+    my $ipt = IPTables::Parse->new();
+
+    my @rule_num;
+    for my $rule (@{$ipt->chain_rules('nat','PREROUTING')}) {
+        lock_hash(%$rule);
+        return $rule->{rule_num}
+            if $rule->{dst} eq $arg{local_ip}
+                && $rule->{to_port} eq $arg{domain_port}
+                && $rule->{to_ip} eq $arg{domain_ip}
+    }
+    return;
+}
+
 sub _add_iptable_nat {
     my $self = shift;
     my %args = @_;
+
 
     #iptables -t nat -I PREROUTING -p tcp -d public_ip --dport 1111 -j DNAT --to-destination private_ip:443
     my $remote_ip = $args{remote_ip} or confess "Mising remote_ip";
@@ -911,8 +937,58 @@ sub _add_iptable_nat {
 }
 
 
+
+
 sub _new_free_port {
-    return 5800;
+    my $self = shift;
+    my $used_port = {};
+    $self->_list_used_ports_sql($used_port);
+    $self->_list_used_ports_netstat($used_port);
+    #TODO
+    #$self->_list_used_ports_nat2016-July/thread.html(\$used_port);
+
+    warn Dumper($used_port);
+    my $free_port = 8400;
+    for (;;) {
+        last if !$used_port->{$free_port};
+        $free_port++ ;
+        warn $free_port;
+    }
+    return $free_port;
+
+}
+
+sub _list_used_ports_sql {
+    my $self = shift;
+    my $used_port = shift;
+
+    my $sth = $$CONNECTOR->dbh->prepare("SELECT public_port FROM domain_ports ");
+    $sth->execute();
+    my $port;
+    $sth->bind_columns(\$port);
+
+    while ($sth->fetch ) { $used_port->{$port}++ };
+    
+}
+
+sub _list_used_ports_netstat {
+    my $self = shift;
+    my $used_port = shift;
+
+    my @cmd = ('netstat', '-tln');
+    my ($in, $out, $err);
+    run3(\@cmd, \$in, \$err, \$out);
+
+    for my $line (split /\n/, $out) {
+        my ($port) = $line =~ 
+                       /^tcp
+                        \s+\d+
+                        \s+\d+
+                        \s+\d+\.\d+\.\d+\.\d+
+                        \:(\d+)/;
+        $used_port->{$port}++ if $port;
+    }
+
 }
 
 sub _close_nat_ports {
