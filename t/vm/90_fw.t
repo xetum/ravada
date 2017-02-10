@@ -155,7 +155,8 @@ sub test_chain {
 sub test_chain_prerouting {
     my $vm_name = shift;
 
-    my ($local_ip,$port, $domain_ip, $enabled) = @_;
+    my ($local_ip,$port, $domain_ip, $expect) = @_;
+    $expect = 0 if !$expect;
     my $ipt = IPTables::Parse->new();
 
     my @rule_num;
@@ -164,18 +165,15 @@ sub test_chain_prerouting {
         push @rule_num,([$rule->{rule_num},$rule->{extended}])
             if $rule->{dst} eq $local_ip
                 && $rule->{to_port} eq $port
-                && $rule->{dst} eq $domain_ip
+                && $rule->{to_ip} eq $domain_ip
     }
 
-    ok(scalar @rule_num == 1
-        ,"[$vm_name] Expecting 1 rule for dst: $local_ip to_port: $port"
+    return ok(scalar @rule_num == $expect
+        ,"[$vm_name] Expecting $expect rule for dst: $local_ip "
+            ." to_port: $port"
+            ." to_ip: $domain_ip"
             ." got :".scalar @rule_num
-    ) 
-            if $enabled;
-    ok(!scalar @rule_num,"[$vm_name] Expecting no rule for $local_ip: $port"
-                        .", got ".Dumper(\@rule_num) )
-        if !$enabled;
-
+    );
 }
 
 sub flush_rules {
@@ -205,12 +203,13 @@ sub test_fw_ssh {
         sleep 1;
     }
     ok($domain->ip,"Expecting an IP for the domain ".$domain->name) or return;
+    eval { $domain->open_nat_ports( remote_ip => $remote_ip, user => $USER) };
 
     my ($public_ip,$public_port)= $domain->public_address($port);
 
     diag("Open in $public_ip / $public_port");
-    like($public_ip,qr{^\d+\.\d+\.\d+\.\d+$});
-    like($public_port, qr{^\d+$});
+    like(($public_ip or '')   ,qr{^\d+\.\d+\.\d+\.\d+$});
+    like(($public_port or '') ,qr{^\d+$});
 
     #comprova que està obert a les iptables per aquest port desde la $remote_ip
     my $vm = $RVD_BACK->search_vm($vm_name);
@@ -226,13 +225,11 @@ sub test_fw_ssh {
     die "No domain ip for ".$domain->name   if !$domain_ip;
 
     test_chain($vm_name, $local_ip, $public_port, $remote_ip,1);
-    test_chain_prerouting($vm_name, $local_ip, $port, $domain_ip, 1);
+    test_chain_prerouting($vm_name, $local_ip, $port, $domain_ip, 1) 
+        or exit;
 
-    eval {
-        $domain->open_nat_ports( remote_ip => $remote_ip, user => $USER);
-    };
-    like($@,qr{UNIQUE});
-    test_chain_prerouting($vm_name, $local_ip, $port, 1);
+    eval { $domain->open_nat_ports( remote_ip => $remote_ip, user => $USER) };
+    test_chain_prerouting($vm_name, $local_ip, $port,$domain_ip,1) or exit;
 
     $domain->shutdown_now($USER) if $domain->is_active;
     {
