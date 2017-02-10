@@ -22,7 +22,7 @@ has 'domain' => (
 has '_ip' => (
     is => 'rw'
     ,isa => 'Str'
-    ,default => sub { return '192.168.122.'.int rand(255)}
+    ,default => sub { return '1.1.1.'.int rand(255)}
 );
 
 our $DIR_TMP = "/var/tmp/rvd_void";
