@@ -1046,6 +1046,25 @@ sub _cmd_rename_domain {
 
 }
 
+sub _cmd_nat_ports {
+    my $self = shift;
+    my $request = shift;
+
+    my $uid = $request->args('uid');
+    my $id_domain = $request->args('id_domain') or die "ERROR: Missing id_domain";
+
+    my $user = Ravada::Auth::SQL->search_by_id($uid);
+    my $domain = $self->search_domain_by_id($id_domain);
+
+    confess "Unkown domain ".Dumper($request)   if !$domain;
+    die "ERROR: User $uid not allowed to run nat_ports\n"
+        if $user->id != $domain->id_owner
+            && !$user->is_admin;
+
+    $domain->open_nat_ports(remote_ip => $request->args('remote_ip'), user => $user);
+    
+}
+
 sub _req_method {
     my $self = shift;
     my  $cmd = shift;
@@ -1058,6 +1077,7 @@ sub _req_method {
         ,remove => \&_cmd_remove
         ,resume => \&_cmd_resume
       ,shutdown => \&_cmd_shutdown
+     ,nat_ports => \&_cmd_nat_ports
     ,domdisplay => \&_cmd_domdisplay
     ,screenshot => \&_cmd_screenshot
    ,remove_base => \&_cmd_remove_base

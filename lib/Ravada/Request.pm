@@ -48,6 +48,7 @@ our %VALID_ARG = (
     ,screenshot_domain => { id_domain => 1, filename => 2 }
     ,start_domain => {%$args_manage, remote_ip => 1 }
     ,rename_domain => { uid => 1, name => 1, id_domain => 1}
+    ,nat_ports => { uid => 1, id_domain => 1, remote_ip => 1}
 );
 
 our %CMD_SEND_MESSAGE = map { $_ => 1 }
@@ -686,6 +687,36 @@ sub rename_domain {
         , id_domain => $args->{id_domain}
              , args => encode_json($args)
     );
+
+}
+
+=head2 nat_ports
+
+Run the NAT for the domain open ports defined.
+
+    $domain->add_nat(22);
+    my $req = Ravada::Request->nat_ports(
+              uid => $user->id
+       ,id_domain => $domain->id
+    );
+
+=cut
+
+sub nat_ports {
+    my $proto = shift;
+    my $class=ref($proto) || $proto;
+
+    my $args = _check_args('nat_ports', @_ );
+
+    my $self = {};
+    bless($self,$class);
+
+    return $self->_new_request(
+            command => 'nat_ports'
+        , id_domain => $args->{id_domain}
+             , args => encode_json($args)
+    );
+
 
 }
 
