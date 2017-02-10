@@ -152,29 +152,6 @@ sub test_chain {
 
 }
 
-sub test_chain_prerouting {
-    my $vm_name = shift;
-
-    my ($local_ip,$port, $domain_ip, $expect) = @_;
-    $expect = 0 if !$expect;
-    my $ipt = IPTables::Parse->new();
-
-    my @rule_num;
-    for my $rule (@{$ipt->chain_rules('nat','PREROUTING')}) {
-        lock_hash(%$rule);
-        push @rule_num,([$rule->{rule_num},$rule->{extended}])
-            if $rule->{dst} eq $local_ip
-                && $rule->{to_port} eq $port
-                && $rule->{to_ip} eq $domain_ip
-    }
-
-    return ok(scalar @rule_num == $expect
-        ,"[$vm_name] Expecting $expect rule for dst: $local_ip "
-            ." to_port: $port"
-            ." to_ip: $domain_ip"
-            ." got :".scalar @rule_num
-    );
-}
 
 sub flush_rules {
     my $ipt = open_ipt();
