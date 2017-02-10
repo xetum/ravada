@@ -863,7 +863,7 @@ sub open_nat_ports {
         $sth_insert->execute($self->id
             , $local_ip, $public_port
             , $domain_ip, $port
-            , $name)
+            , $name);
         $n_open++;
     }
     $sth->finish;
