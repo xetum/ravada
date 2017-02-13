@@ -235,12 +235,14 @@ sub test_chain_prerouting {
                 && $rule->{to_ip} eq $domain_ip
     }
 
-    return ok(scalar @rule_num == $expect
-        ,"[$vm_name] Expecting $expect rule for dst: $local_ip "
+    my $status = scalar @rule_num == $expect;
+
+    my $msg = "[$vm_name] Expecting $expect rule for dst: $local_ip "
             ." to_port: $port"
             ." to_ip: $domain_ip"
             ." got :".scalar @rule_num
-    );
+    ;
+    return ($status, $msg);
 }
 
 
