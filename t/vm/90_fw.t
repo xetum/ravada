@@ -20,7 +20,7 @@ my $FILE_CONFIG = 't/etc/ravada.conf';
 my @ARG_RVD = ( config => $FILE_CONFIG,  connector => $test->connector);
 
 my %ARG_CREATE_DOM = (
-      KVM => [ id_iso => 34 ]
+      KVM => [ id_iso => 35 ]
     ,Void => [ ]
 );
 

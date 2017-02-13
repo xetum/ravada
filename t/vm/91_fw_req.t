@@ -20,7 +20,7 @@ my $FILE_CONFIG = 't/etc/ravada.conf';
 my @ARG_RVD = ( config => $FILE_CONFIG,  connector => $test->connector);
 
 my %ARG_CREATE_DOM = (
-      KVM => [ id_iso => 1 ]
+      KVM => [ id_iso => 35 ]
     ,Void => [ ]
 );
 
@@ -132,7 +132,7 @@ sub test_fw_domain_nat{
         }
         ok($domain_ip,"Expecting a domain IP") or return;
     }
-    test_chain_prerouting($vm_name, $local_ip, $domain_port, $domain_ip, 0);
+    ok(test_chain_prerouting($vm_name, $local_ip, $domain_port, $domain_ip, 0));
     {
         my $req = Ravada::Request->nat_ports(
             uid => $USER->id
@@ -146,13 +146,13 @@ sub test_fw_domain_nat{
         is($req->status,'done');
         is($req->error,'');
     }
-    test_chain_prerouting($vm_name, $local_ip, $domain_port, $domain_ip, 1);
+    ok(test_chain_prerouting($vm_name, $local_ip, $domain_port, $domain_ip, 1));
     {
         my $vm = rvd_back->search_vm($vm_name);
         my $domain = $vm->search_domain($domain_name);
-        $domain->shutdown_now();
+        $domain->shutdown_now($USER);
     }
-    test_chain_prerouting($vm_name, $local_ip, $domain_port, $domain_ip, 0);
+    ok(test_chain_prerouting($vm_name, $local_ip, $domain_port, $domain_ip, 0));
 
 }
     
