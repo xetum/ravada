@@ -23,6 +23,20 @@ my $USER = create_user('foo','bar');
 
 ########################################################################3
 
+sub test_create_domain {
+    my $domain = shift;
+
+    my $name = 'Acme';
+    my $ip = '192.168.1.2/32';
+    my $description = 'Test network';
+#    my $net = Ravada::Network->new(name => $name, address => $ip, description => $description, all_domains => 1, no_domains => 0 );
+    my $net = Ravada::Network->new(name => $name , address => $ip);
+#   ok(!$net->create_network($domain->id),"Expecting create domain function");
+    ok(!$net->create_network($domain->id),"Insert failed");
+#Insertar a la bbdd les dades
+#Fer un select quan estigui insertat
+}
+
 sub test_allow_all {
     my $domain = shift;
 
@@ -194,6 +208,7 @@ test_allow_all($domain);
 test_deny_all($domain);
 
 test_allow_domain($domain);
+test_create_domain($domain);
 
 remove_old_domains();
 remove_old_disks();

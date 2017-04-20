@@ -143,4 +143,26 @@ sub list_networks {
     return @networks;
 }
 
+sub create_network {
+    my $self = shift;
+    #my ($name, $address, $description, $alldomains, $nodomains) = @_;
+    my ($name, $ip) = @_;
+
+warn ("NOM: $name \n");
+warn ("IP: $ip \n");
+    _init_connector();
+
+    #my $sth = $$CONNECTOR->dbh->prepare("INSERT INTO networks (name,address,description,all_domains,no_domains) "." VALUES (?,?,?,?,?) ");
+###    my $sth = $$CONNECTOR->dbh->prepare("INSERT INTO networks (name,address) "." VALUES (?,?) ");
+###    $sth->execute($name, $ip);
+    #$sth->execute($name, $address, $description, $alldomains, $nodomains);
+
+#    my $sth = $test->dbh->prepare("INSERT INTO networks (name,address,all_domains) "
+#        ." VALUES (?,?,?) ");
+
+#    $sth->execute('foo', '192.168.1.0/24', 1);
+###    $sth->finish;
+
+}
+
 1;
