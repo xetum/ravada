@@ -25,6 +25,9 @@ navbar-inverse navbar-fixed-top" role="navigation">
                     <li><a href="/admin/machines">
                       <i class="fa fa-desktop" aria-hidden="true"></i>&nbsp<%=l 'machines' %></a>
                     </li>
+                    <li><a href="/admin/networks">
+                      <i class="fa fa-sitemap" aria-hidden="true"></i>&nbsp<%=l 'networks' %></a>
+                    </li>
                     <li><a href="/admin/users">
                       <i class="fa fa-user" aria-hidden="true"></i>&nbsp<%=l 'users' %></a>
                     </li>

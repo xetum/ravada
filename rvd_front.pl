@@ -184,6 +184,12 @@ any '/admin' => sub {
   my $c = shift;
   $c->redirect_to("/admin/machines")
 };
+
+any '/admin/networks' => sub {
+    my $c = shift;
+    $c->render(template => 'main/networks');
+};
+
 any '/admin/(#type)' => sub {
   my $c = shift;
 
