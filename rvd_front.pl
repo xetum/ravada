@@ -187,6 +187,8 @@ any '/admin' => sub {
 
 any '/admin/networks' => sub {
     my $c = shift;
+    push @{$c->stash->{css}}, '/css/admin.css';
+    push @{$c->stash->{js}}, '/js/admin.js';
     $c->render(template => 'main/networks');
 };
 

@@ -174,3 +174,6 @@ ravadaApp.directive("solShowMachine", swMach)
     $scope.updatePromise = $interval($scope.updateMessages,3000);
   };
 
+angular.module('DemoApp', ['ngMessages']);
+
+angular.bootstrap(document.getElementById('demoApp'), ['DemoApp']);
