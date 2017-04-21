@@ -13,7 +13,7 @@ use Hash::Util qw(lock_hash);
 use Moose;
 use MooseX::Types::NetAddr::IP qw( NetAddrIP );
 use Moose::Util::TypeConstraints;
-
+use Data::Dumper;
 use NetAddr::IP;
 
 
@@ -40,6 +40,26 @@ sub _init_connector {
     $CONNECTOR = \$Ravada::Front::CONNECTOR if !defined $$CONNECTOR;
 }
 
+
+sub BUILD {
+    my $self = shift;
+
+    my $name = $_[0]->{name};
+    $name = "" unless defined $name;
+
+    _init_connector();
+#    warn "BUILD ".Dumper(\@_);
+#    warn "NAME: $name \n";
+    #check if exists
+    #_select_net_db
+    #then create_network
+    if ( $name ne '' ) {
+    warn "NAME: $name \n";
+    my $row = $self->_do_select_net_db( name => $name);
+    lock_hash(%$row);
+    confess "ERROR: I can't find network name=$name" if !$row || !keys %$row;
+    };
+}
 =head2 allowed
 
 Returns true if the IP is allowed to run a domain
@@ -117,6 +137,41 @@ sub _allowed_domain_anonymous {
     $sth->finish;
 
     return $allowed;
+}
+
+sub _do_select_net_db {
+    my $self = shift;
+    my $name = shift;
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "SELECT name FROM networks" );
+    $sth->execute();
+    my $row = $sth->fetchrow_hashref;
+    $sth->finish;
+    return $row;
+}
+
+sub _select_net_db {
+    my $self = shift;
+    #search network if not exists insert
+    my ($row) = ($self->_do_select_net_db(@_) or $self->_insert_net_db());
+
+    $self->{_data} = $row;
+    return $row if $row->{id};
+}
+
+sub _insert_net_db {
+    my $self = shift;
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "INSERT INTO networks (name,address,description) "
+        ." VALUES(?,?,?)"
+    );
+    my $name = $self->name;
+    $sth->execute($name,$self->address,$self->description);
+    $sth->finish;
+
+
+    return $self->_do_select_net_db( name => $name);
 }
 
 

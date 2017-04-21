@@ -23,18 +23,24 @@ my $USER = create_user('foo','bar');
 
 ########################################################################3
 
-sub test_create_domain {
+sub test_create_network {
     my $domain = shift;
 
     my $name = 'Acme';
     my $ip = '192.168.1.2/32';
     my $description = 'Test network';
 #    my $net = Ravada::Network->new(name => $name, address => $ip, description => $description, all_domains => 1, no_domains => 0 );
-    my $net = Ravada::Network->new(name => $name , address => $ip);
+    my $net = Ravada::Network->new(name => $name , address => $ip, descripton => $description);
 #   ok(!$net->create_network($domain->id),"Expecting create domain function");
-    ok(!$net->create_network($domain->id),"Insert failed");
-#Insertar a la bbdd les dades
-#Fer un select quan estigui insertat
+    ok(!$net->create_network($name, $ip),"Insert failed");
+}
+
+sub test_list_networks {
+    my $networks = list_networks();
+    warn "Network list: $networks";
+    my $ip = '192.168.1.2/32';
+    my $net = Ravada::Network->new(address => $ip);
+    ok(!$net->list_networks(),"List problems");
 }
 
 sub test_allow_all {
@@ -44,10 +50,10 @@ sub test_allow_all {
     my $net = Ravada::Network->new(address => $ip);
     ok(!$net->allowed($domain->id),"Expecting not allowed from unknown network");
 
-    my $sth = $test->dbh->prepare("INSERT INTO networks (name,address,all_domains) "
-        ." VALUES (?,?,?) ");
+    my $sth = $test->dbh->prepare("INSERT INTO networks (name, address, description, all_domains) "
+        ." VALUES (?,?,?,?) ");
 
-    $sth->execute('foo', '192.168.1.0/24', 1);
+    $sth->execute('foo', '192.168.1.0/24', 'acme', 1);
     $sth->finish;
 
     ok(!$net->allowed_anonymous($domain->id),"Expecting denied anonymous from known network");
@@ -208,7 +214,10 @@ test_allow_all($domain);
 test_deny_all($domain);
 
 test_allow_domain($domain);
-test_create_domain($domain);
+test_create_network($domain);
+
+#test_list_network($domain);
+
 
 remove_old_domains();
 remove_old_disks();
