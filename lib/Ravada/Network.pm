@@ -45,19 +45,17 @@ sub BUILD {
     my $self = shift;
 
     my $name = $_[0]->{name};
+    my $address = $_[0]->{address};
+    my $description = $_[0]->{description};
     $name = "" unless defined $name;
 
     _init_connector();
-#    warn "BUILD ".Dumper(\@_);
-#    warn "NAME: $name \n";
-    #check if exists
-    #_select_net_db
-    #then create_network
     if ( $name ne '' ) {
-    warn "NAME: $name \n";
-    my $row = $self->_do_select_net_db( name => $name);
-    lock_hash(%$row);
-    confess "ERROR: I can't find network name=$name" if !$row || !keys %$row;
+    warn "NAME: $name, $address, $description \n";
+
+    my $row = $self->_insert_net_db($name, $address, $description);
+    my $list = $self->list_networks;
+    warn ("LIST $list\n");
     };
 }
 =head2 allowed
@@ -144,11 +142,9 @@ sub _do_select_net_db {
     my $name = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
-        "SELECT name FROM networks" );
-    $sth->execute();
-    my $row = $sth->fetchrow_hashref;
+        " SELECT name FROM networks where name=?") ;
+    $sth->execute($name);
     $sth->finish;
-    return $row;
 }
 
 sub _select_net_db {
@@ -162,18 +158,18 @@ sub _select_net_db {
 
 sub _insert_net_db {
     my $self = shift;
+    my $name = shift;
+    my $address = shift;
+    my $description = shift;
+
     my $sth = $$CONNECTOR->dbh->prepare(
-        "INSERT INTO networks (name,address,description) "
+        "INSERT INTO networks (name, address, description) "
         ." VALUES(?,?,?)"
     );
-    my $name = $self->name;
-    $sth->execute($name,$self->address,$self->description);
+warn ("NAME--> $name, $address, $description \n");
+    $sth->execute($name,$address,$description);
     $sth->finish;
-
-
-    return $self->_do_select_net_db( name => $name);
 }
-
 
 sub list_networks {
     my $self = shift;
@@ -196,28 +192,6 @@ sub list_networks {
     $sth->finish;
 
     return @networks;
-}
-
-sub create_network {
-    my $self = shift;
-    #my ($name, $address, $description, $alldomains, $nodomains) = @_;
-    my ($name, $ip) = @_;
-
-warn ("NOM: $name \n");
-warn ("IP: $ip \n");
-    _init_connector();
-
-    #my $sth = $$CONNECTOR->dbh->prepare("INSERT INTO networks (name,address,description,all_domains,no_domains) "." VALUES (?,?,?,?,?) ");
-###    my $sth = $$CONNECTOR->dbh->prepare("INSERT INTO networks (name,address) "." VALUES (?,?) ");
-###    $sth->execute($name, $ip);
-    #$sth->execute($name, $address, $description, $alldomains, $nodomains);
-
-#    my $sth = $test->dbh->prepare("INSERT INTO networks (name,address,all_domains) "
-#        ." VALUES (?,?,?) ");
-
-#    $sth->execute('foo', '192.168.1.0/24', 1);
-###    $sth->finish;
-
 }
 
 1;

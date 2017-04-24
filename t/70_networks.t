@@ -30,9 +30,8 @@ sub test_create_network {
     my $ip = '192.168.1.2/32';
     my $description = 'Test network';
 #    my $net = Ravada::Network->new(name => $name, address => $ip, description => $description, all_domains => 1, no_domains => 0 );
-    my $net = Ravada::Network->new(name => $name , address => $ip, descripton => $description);
+    my $net = Ravada::Network->new(name => $name , address => $ip, description => $description);
 #   ok(!$net->create_network($domain->id),"Expecting create domain function");
-    ok(!$net->create_network($name, $ip),"Insert failed");
 }
 
 sub test_list_networks {
