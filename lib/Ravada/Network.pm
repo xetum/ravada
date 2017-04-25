@@ -47,7 +47,7 @@ sub BUILD {
     my $name = $_[0]->{name};
     my $address = $_[0]->{address};
     my $description = $_[0]->{description};
-    my $all_domains = $_[0]->{all_domains} ? 1 : 0;
+    my $all_domains = $_[0]->{all_domains} ? 1 : 0; #when checkbox is not checked is NULL, change to 0
     my $no_domains = $_[0]->{no_domains} ? 1: 0;
 
     $name = "" unless defined $name;
