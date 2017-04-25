@@ -52,10 +52,7 @@ sub BUILD {
     _init_connector();
     if ( $name ne '' ) {
 
-    #my $row = $self->_insert_net_db($name, $address, $description);
     my $row = $self -> _select_net_db( $name, $address, $description);
-    #my $row = $self -> _do_select_net_db( $name);
-    #my @list = $self->list_networks;
     };
 }
 =head2 allowed
@@ -146,14 +143,13 @@ sub _do_select_net_db {
     $sth->execute($name);
     my $row = $sth->fetchrow_hashref;
     $sth->finish;
-    warn Dumper ($row).$name;
     return $row;
 }
 
 sub _select_net_db {
     my $self = shift;
     #search network if not exists insert
-    my ($row) = ($self->_do_select_net_db(@_) or $self->_insert_net_db(@_));
+    my ($row) = ($self->_do_select_net_db(@_)  or $self->_insert_net_db(@_));
 
     $self->{_data} = $row;
     return $row if $row->{id};

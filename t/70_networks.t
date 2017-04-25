@@ -29,10 +29,15 @@ sub test_create_network {
     my $name = 'TNT';
     my $ip = '192.168.1.0/24';
     my $description = 'Test 2 network';
-#    my $net = Ravada::Network->new(name => $name, address => $ip, description => $description, all_domains => 1, no_domains => 0 );
+    diag("Check if network exists and insert in db");
     my $net = Ravada::Network->new(name => $name , address => $ip, description => $description);
-    #$test contiene dbh
-    #   ok(!$net->create_network($domain->id),"Expecting create domain function");
+    ok($net,"Insert in db fail");
+    diag("Search network in db");
+    my $sth = $test->connector->dbh->prepare("SELECT name FROM networks WHERE name=?");
+    $sth->execute($name);
+    my $row = $sth->fetchrow_hashref;
+    $sth->finish;
+    ok($row->{name},"I shouldn't find $name in the SQL db ".Dumper($row));
 }
 
 sub test_list_networks {
