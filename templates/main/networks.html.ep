@@ -15,18 +15,18 @@
                 <fieldset>
 
                 <div class="pure-control-group">
-                  <label>Name</label>
-                  <input name="net_name" ng-model="network.name" type="text" placeholder="insert a network name" required>
-                  <div class="field-message" ng-messages="frm.net_name.$error" ng-if='frm.net_name.$dirty' ng-cloak>
+                  <label>Name*</label>
+                  <input name="name" id='name' type="text" placeholder="insert a network name" required >
+                  <div class="field-message" ng-messages="frm.name.$error" ng-if='frm.name.$dirty' ng-cloak>
                     <div ng-message="required">Network name is required</div>
                   </div>
               </div>
 
                 <div class="pure-control-group">
-                <label>Network</label>
+                <label>Network*</label>
                 <!--<input name="network" ng-model="net.address" type="text" placeholder="i.e. 192.168.10.0/24" required ng-minlength="6" ng-maxlength="10"> -->
-                <input name="network" ng-model="net.address" type="text" placeholder="i.e. 192.168.10.0/24" required >
-                    <div class="field-message" ng-messages="frm.network.$error" ng-if='frm.network.$dirty' ng-cloak>
+                <input name="address" id='address' type="text" placeholder="i.e. 192.168.10.0/24" required >
+                    <div class="field-message" ng-messages="frm.address.$error" ng-if='frm.address.$dirty' ng-cloak>
                         <div ng-message="required">Network address is required</div>
                         <div ng-message="minlength">TODO Network address must have minimum 6 characters</div>
                         <div ng-message="maxlength">TODO Password must have maximum 10 characters</div>
@@ -35,27 +35,27 @@
 
                 <div class="pure-control-group">
                 <label>Description</label>
-                <input name="description" ng-model="net.description" type="text" placeholder="info about this network" >
+                <input name="description" id='description' type="text" placeholder="info about this network" >
                     <div class="field-message" ng-messages="frm.description.$error" ng-if='frm.description.$dirty' ng-cloak>
                     </div> 
                 </div>
 
                 <div class="pure-control-group">
                     <label class="pure-checkbox">
-                    <input name="all_domains" ng-model="alldomains" type="checkbox">
+                    <input name="all_domains" id='all_domains' type="checkbox" value="1">
                     Enable for all domains
                     </label>
                 </div> 
 
                 <div class="pure-control-group">
                     <label class="pure-checkbox">
-                    <input name="no_domains" ng-model="nodomains" type="checkbox">
+                    <input name="no_domains" id='no_domains' type="checkbox" value="1" >
                     Disable for all domains
                     </label>
                 </div> 
 
                 <div class="pure-controls">
-                    <input type="submit" class="pure-button pure-button-primary"
+                    <input type="submit" class="pure-button pure-button-primary" value="Submit"
                         ng-disabled="frm.$invalid" ></input>
                 </div>
 

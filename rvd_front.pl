@@ -190,8 +190,22 @@ any '/admin/networks' => sub {
     my $c = shift;
     push @{$c->stash->{css}}, '/css/admin.css';
     push @{$c->stash->{js}}, '/js/admin.js';
-    $c->render(template => 'main/networks');
+    networks($c);
 };
+
+sub networks {
+    my $c = shift;
+    if ($c->param('name') && $c->param('address') ) {
+
+    Ravada::Network->new(
+        name => $c->param('name'),
+        address => $c->param('address'),
+        description => $c->param('description'),
+        all_domains => $c->param('all_domains'),
+        no_domains => $c->param('no_domains') )
+    }
+    $c->render(template => 'main/networks');
+}
 
 any '/admin/(#type)' => sub {
   my $c = shift;

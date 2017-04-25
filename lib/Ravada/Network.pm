@@ -47,12 +47,15 @@ sub BUILD {
     my $name = $_[0]->{name};
     my $address = $_[0]->{address};
     my $description = $_[0]->{description};
+    my $all_domains = $_[0]->{all_domains} ? 1 : 0;
+    my $no_domains = $_[0]->{no_domains} ? 1: 0;
+
     $name = "" unless defined $name;
 
     _init_connector();
     if ( $name ne '' ) {
 
-    my $row = $self -> _select_net_db( $name, $address, $description);
+    my $row = $self -> _select_net_db( $name, $address, $description, $all_domains, $no_domains );
     };
 }
 =head2 allowed
@@ -160,13 +163,15 @@ sub _insert_net_db {
     my $name = shift;
     my $address = shift;
     my $description = shift;
+    my $all_domains = shift;
+    my $no_domains = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
-        "INSERT INTO networks (name, address, description) "
-        ." VALUES(?,?,?)"
+        "INSERT INTO networks (name, address, description, all_domains, no_domains) "
+        ." VALUES(?,?,?,?,?)"
     );
 
-    $sth->execute($name,$address,$description);
+    $sth->execute($name,$address,$description,$all_domains,$no_domains);
     $sth->finish;
     return $self->_do_select_net_db( $name); ;
 }
