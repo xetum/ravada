@@ -26,12 +26,13 @@ my $USER = create_user('foo','bar');
 sub test_create_network {
     my $domain = shift;
 
-    my $name = 'Acme';
-    my $ip = '192.168.122.0/24';
-    my $description = 'Test network';
+    my $name = 'TNT';
+    my $ip = '192.168.1.0/24';
+    my $description = 'Test 2 network';
 #    my $net = Ravada::Network->new(name => $name, address => $ip, description => $description, all_domains => 1, no_domains => 0 );
     my $net = Ravada::Network->new(name => $name , address => $ip, description => $description);
-#   ok(!$net->create_network($domain->id),"Expecting create domain function");
+    #$test contiene dbh
+    #   ok(!$net->create_network($domain->id),"Expecting create domain function");
 }
 
 sub test_list_networks {

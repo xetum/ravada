@@ -51,10 +51,11 @@ sub BUILD {
 
     _init_connector();
     if ( $name ne '' ) {
-    warn "NAME: $name, $address, $description \n";
 
-    my $row = $self->_insert_net_db($name, $address, $description);
-    my @list = $self->list_networks;
+    #my $row = $self->_insert_net_db($name, $address, $description);
+    my $row = $self -> _select_net_db( $name, $address, $description);
+    #my $row = $self -> _do_select_net_db( $name);
+    #my @list = $self->list_networks;
     };
 }
 =head2 allowed
@@ -141,17 +142,18 @@ sub _do_select_net_db {
     my $name = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
-        " SELECT * FROM networks where name=?") ;
+        " SELECT * FROM networks WHERE name=?") ;
     $sth->execute($name);
     my $row = $sth->fetchrow_hashref;
     $sth->finish;
+    warn Dumper ($row).$name;
     return $row;
 }
 
 sub _select_net_db {
     my $self = shift;
     #search network if not exists insert
-    my ($row) = ($self->_do_select_net_db(@_) or $self->_insert_net_db());
+    my ($row) = ($self->_do_select_net_db(@_) or $self->_insert_net_db(@_));
 
     $self->{_data} = $row;
     return $row if $row->{id};
@@ -167,9 +169,10 @@ sub _insert_net_db {
         "INSERT INTO networks (name, address, description) "
         ." VALUES(?,?,?)"
     );
-warn ("NAME--> $name, $address, $description \n");
+
     $sth->execute($name,$address,$description);
     $sth->finish;
+    return $self->_do_select_net_db( $name); ;
 }
 
 sub list_networks {
