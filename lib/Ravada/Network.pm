@@ -54,8 +54,7 @@ sub BUILD {
     warn "NAME: $name, $address, $description \n";
 
     my $row = $self->_insert_net_db($name, $address, $description);
-    my $list = $self->list_networks;
-    warn ("LIST $list\n");
+    my @list = $self->list_networks;
     };
 }
 =head2 allowed
@@ -142,9 +141,11 @@ sub _do_select_net_db {
     my $name = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
-        " SELECT name FROM networks where name=?") ;
+        " SELECT * FROM networks where name=?") ;
     $sth->execute($name);
+    my $row = $sth->fetchrow_hashref;
     $sth->finish;
+    return $row;
 }
 
 sub _select_net_db {

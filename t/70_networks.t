@@ -27,7 +27,7 @@ sub test_create_network {
     my $domain = shift;
 
     my $name = 'Acme';
-    my $ip = '192.168.1.2/32';
+    my $ip = '192.168.122.0/24';
     my $description = 'Test network';
 #    my $net = Ravada::Network->new(name => $name, address => $ip, description => $description, all_domains => 1, no_domains => 0 );
     my $net = Ravada::Network->new(name => $name , address => $ip, description => $description);
