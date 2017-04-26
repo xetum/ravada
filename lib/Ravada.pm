@@ -3,7 +3,7 @@ package Ravada;
 use warnings;
 use strict;
 
-our $VERSION = '0.2.4';
+our $VERSION = '0.2.5';
 
 use Carp qw(carp croak);
 use Data::Dumper;
@@ -162,6 +162,7 @@ sub _upgrade_table {
 
     warn "INFO: adding $field $definition to $table\n";
     $dbh->do("alter table $table add $field $definition");
+    return 1;
 }
 
 sub _create_table {
@@ -223,9 +224,21 @@ sub _upgrade_tables {
     $self->_upgrade_table('file_base_images','target','varchar(64) DEFAULT NULL');
     $self->_upgrade_table('vms','vm_type',"char(20) NOT NULL DEFAULT 'KVM'");
     $self->_upgrade_table('requests','at_time','int(11) DEFAULT NULL');
+
     $self->_upgrade_table('iso_images','md5_url','varchar(255)');
     $self->_upgrade_table('iso_images','file_re','char(64)');
     $self->_upgrade_table('iso_images','device','varchar(255)');
+
+    $self->_upgrade_table('users','language','char(3) DEFAULT NULL');
+    if ( $self->_upgrade_table('users','is_external','int(11) DEFAULT 0')) {
+        my $sth = $CONNECTOR->dbh->prepare(
+            "UPDATE users set is_external=1 WHERE password='*LK* no pss'"
+        );
+        $sth->execute;
+    }
+
+    $self->_upgrade_table('networks','requires_password','int(11)');
+    $self->_upgrade_table('domains','spice_password','varchar(20) DEFAULT NULL');
 }
 
 
