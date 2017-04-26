@@ -4,6 +4,7 @@ ravadaApp.directive("solShowMachine", swMach)
         .controller("machinesPage", machinesPageC)
         .controller("usersPage", usersPageC)
         .controller("messagesPage", messagesPageC)
+        .controller("networksPage", networksPageC)
 
   function swMach() {
     return {
@@ -188,6 +189,23 @@ ravadaApp.directive("solShowMachine", swMach)
     //On load code
     $scope.getMessages();
     $scope.updatePromise = $interval($scope.updateMessages,3000);
+  };
+
+function networksPageC($scope, $http, $interval, request) {
+    $http.get('/pingbackend.json').then(function(response) {
+      $scope.pingbe_fail = !response.data;
+    });
+    $scope.getNetworks = function() {
+      $http.get('/list_networks.json').then(function(response) {
+        $scope.list_networks= response.data;
+      });
+    }
+    $scope.action = function(target,action,machineId){
+      $http.get('/'+target+'/'+action+'/'+machineId+'.json');
+    };
+    //On load code
+    $scope.getNetworks();
+    $scope.updatePromise = $interval($scope.getNetworks,3000);
   };
 
 angular.module('Netform', ['ngMessages']);

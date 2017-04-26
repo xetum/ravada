@@ -3,70 +3,68 @@
 %= include 'bootstrap/header'
 <body id="page-top" data-spy="scroll" data-target=".navbar-fixed-top" role="document">
     <div id="wrapper">
-    <div ng-controller="networks">
+    <div ng-controller="networksPage">
     %= include 'bootstrap/navigation'
-    <div id="page-wrapper" class ="row">
-        <div class="page-header col-md-8 col-md-offset-2">
-        <div class="panel panel-default">
-            <div class="panel-heading">
-                <h2 class="text-center">Networks</h2>
-                <div class="container" id="netform">
-                <form class="pure-form pure-form-aligned" name="frm" action="" method="post" novalidate autocomplete="off">
-                <fieldset>
-
-                <div class="pure-control-group">
-                  <label>Name*</label>
-                  <input name="name" id='name' ng-model="name" type="text" placeholder="insert a network name" required >
-                  <div class="field-message" ng-messages="frm.name.$error" ng-if='frm.name.$dirty' ng-cloak>
-                    <div ng-message="required">Network name is required</div>
-                  </div>
-              </div>
-
-                <div class="pure-control-group">
-                <label>Network*</label>
-                <input name="address" id='address' ng-model="address" type="text" placeholder="i.e. 192.168.10.0/24" required >
-                    <div class="field-message" ng-messages="frm.address.$error" ng-if='frm.address.$dirty' ng-cloak>
-                        <div ng-message="required">Network address is required</div>
-                    </div>
-              </div>
-
-                <div class="pure-control-group">
-                <label>Description</label>
-                <input name="description" id='description' type="text" placeholder="info about this network" >
-                    <div class="field-message" ng-messages="frm.description.$error" ng-if='frm.description.$dirty' ng-cloak>
-                    </div> 
-                </div>
-
-                <div class="pure-control-group">
-                    <label class="pure-checkbox">
-                    <input name="all_domains" id='all_domains' type="checkbox" value="1">
-                    Enable for all domains
-                    </label>
-                </div> 
-
-                <div class="pure-control-group">
-                    <label class="pure-checkbox">
-                    <input name="no_domains" id='no_domains' type="checkbox" value="1" >
-                    Disable for all domains
-                    </label>
-                </div> 
-
-                <div class="pure-controls">
-                    <input type="submit" class="pure-button pure-button-primary" value="Submit"
-                        ng-disabled="frm.$invalid" ></input>
-                </div>
-
-                </fieldset>
-                </form>
-                </div>
+    <div id="page-wrapper">
+      <div id="admin-content">
+<div class="panel-body">
+    <div class="col-lg-12">
+        <div class="row">
+            <div class="col-md-8"><h2><%=l 'Networks' %></h2></div>
+            <div class="col-md-4" align="right">
+                <h2>
+                    <a type="button" class="btn btn-success" href="/admin/new_networks.html">
+                        <b><%=l 'New Network' %></b>
+                    </a>
+                </h2>
             </div>
         </div>
-        </div>
-    </div>
-    </div>
-    </div>
-    %= include 'bootstrap/scripts'
-    %= include 'bootstrap/footer'
+%=      include 'bootstrap/navigation'
+
+<div class="panel-body col-lg-12">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th><%=l 'Name' %></th>
+        <th><%=l 'Address' %></th>
+        <th><%=l 'Description' %></th>
+        <th><%=l 'All Domains' %></th>
+        <th><%=l 'No Domains' %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="networks in list_networks">
+        <td>{{networks.name}}</td>
+        <td>{{networks.address}}</td>
+        <td>{{networks.description}}</td> 
+
+          </a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</div>
+</div>
+</div>
+</div>
+%= include 'bootstrap/scripts'
+%= include 'bootstrap/footer'
+<div id="overNotifications" class="notifications" ng-controller="notifCrtl">
+<script type="text/ng-template" id="alert.html">
+<div ng-transclude></div>
+</script>
+<div uib-alert ng-repeat="alert in alerts"
+ ng-class="'alert-' + (alert.type || 'warning')"
+  ng-click="closeAlert($index)"
+  ng-mouseover="alert.showMessage = false"
+  ng-mouseleave="alert.showMessage = true"
+  ng-bind-html="alert.subject">
+  {{alert.subject}}
+  <div ng-if="alert.message" ng-init="alert.showMessage = true" ng-hide="alert.showMessage" ng-bind-html="alert.message">
+    {{alert.message}}
+  </div>
+</div>
+</div>
 </body>
-</html> 
-><wbr>
+</html>

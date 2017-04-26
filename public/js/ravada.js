@@ -10,7 +10,8 @@
             .service("request", gtRequest)
             .service("listMach", gtListMach)
             .service("listMess", gtListMess)
-    	    .service("listUsers", gtListUsers)
+            .service("listUsers", gtListUsers)
+            .service("listNetworks", gtListNetworks)
             .controller("SupportForm", suppFormCtrl)
             .controller("bases", mainpageCrtl)
             .controller("singleMachinePage", singleMachinePageC)
@@ -200,6 +201,14 @@
     function gtListUsers($resource){
 
         return $resource('/list_users.json',{},{
+            get:{isArray:true}
+        });
+
+    };
+
+    function gtListNetworks($resource){
+
+        return $resource('/list_networks.json',{},{
             get:{isArray:true}
         });
 

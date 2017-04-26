@@ -189,6 +189,11 @@ any '/admin' => sub {
 };
 
 any '/admin/networks' => sub {
+  my $c = shift;
+  $c->render(template => '/main/networks');
+};
+
+any '/admin/new_networks' => sub {
     my $c = shift;
     push @{$c->stash->{css}}, '/css/admin.css';
     push @{$c->stash->{js}}, '/js/admin.js';
@@ -206,7 +211,7 @@ sub networks {
         all_domains => $c->param('all_domains'),
         no_domains => $c->param('no_domains') )
     }
-    $c->render(template => 'main/networks');
+    $c->render(template => 'main/new_networks');
 }
 
 any '/admin/(#type)' => sub {
@@ -286,6 +291,11 @@ get '/pingbackend.json' => sub {
 
     my $c = shift;
     $c->render(json => $RAVADA->ping_backend);
+};
+
+get '/list_networks.json' => sub {
+    my $c = shift;
+    $c->render(json => $RAVADA->list_networks);
 };
 
 # machine commands

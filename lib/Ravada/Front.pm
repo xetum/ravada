@@ -704,6 +704,26 @@ sub list_bases_anonymous {
 
 }
 
+=head2 list_networks
+
+Returns a reference to a list of the networks
+
+=cut
+
+sub list_networks {
+    my $self = shift;
+    my $sth = $CONNECTOR->dbh->prepare("SELECT * FROM networks ");
+    $sth->execute();
+
+    my @networks = ();
+    while ( my $row = $sth->fetchrow_hashref) {
+        push @networks, ($row);
+    }
+    $sth->finish;
+
+    return \@networks;
+}
+
 =head2 disconnect_vm 
 
 Disconnects all the conneted VMs
