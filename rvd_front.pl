@@ -98,7 +98,7 @@ hook before_routes => sub {
   $c->stash(version => $RAVADA->version."$VERSION_TYPE");
   my $url = $c->req->url->to_abs->path;
   $c->stash(css=>['/css/sb-admin.css']
-            ,js=>['/js/form.js'
+            ,js=>[
                 ,'/js/ravada.js'
                 ]
             ,csssnippets => []
