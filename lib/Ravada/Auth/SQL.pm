@@ -3,6 +3,12 @@ package Ravada::Auth::SQL;
 use warnings;
 use strict;
 
+=head1 NAME
+
+Ravada::Auth::SQL - SQL authentication library for Ravada
+
+=cut
+
 use Carp qw(carp);
 
 use Ravada;
@@ -27,7 +33,12 @@ sub _init_connector {
     $CON= \$Ravada::CONNECTOR          if !$CON || !$$CON;
     $CON= \$Ravada::Front::CONNECTOR   if !$CON || !$$CON;
 
-    confess "undefined connector"   if !$CON || !$$CON;
+    if (!$CON || !$$CON) {
+        my $ravada = Ravada->new();
+        $CON= \$Ravada::CONNECTOR;
+    }
+
+    die "Undefined connector"   if !$CON || !$$CON;
 }
 
 
@@ -70,7 +81,7 @@ sub search_by_id {
 
 Adds a new user in the SQL database. Returns nothing.
 
-    Ravada::Auth::SQL::add_user( 
+    Ravada::Auth::SQL::add_user(
                  name => $user
            , password => $pass
            , is_admin => 0
@@ -95,14 +106,16 @@ sub add_user {
         if keys %args;
 
     my $sth = $$CON->dbh->prepare(
-            "INSERT INTO users (name,password,is_admin,is_temporary) VALUES(?,?,?,?)");
+            "INSERT INTO users (name,password,is_admin,is_temporary, is_external)"
+            ." VALUES(?,?,?,?,?)");
 
     if ($password) {
         $password = sha1_hex($password);
     } else {
         $password = '*LK* no pss';
     }
-    $sth->execute($name,$password,$is_admin,$is_temporary);
+    $sth->execute($name,$password,$is_admin,$is_temporary
+        , ($args{is_external} or 0));
     $sth->finish;
 }
 
@@ -192,7 +205,7 @@ Makes the user admin. Returns nothing.
 
      Ravada::Auth::SQL::make_admin($id);
 
-=cut       
+=cut
 
 sub make_admin {
     my $id = shift;
@@ -201,7 +214,7 @@ sub make_admin {
 
     $sth->execute($id);
     $sth->finish;
-    
+
 }
 
 =head2 remove_admin
@@ -210,7 +223,7 @@ Remove user admin privileges. Returns nothing.
 
      Ravada::Auth::SQL::remove_admin($id);
 
-=cut       
+=cut
 
 sub remove_admin {
     my $id = shift;
@@ -219,7 +232,7 @@ sub remove_admin {
 
     $sth->execute($id);
     $sth->finish;
-    
+
 }
 
 =head2 is_admin
@@ -235,6 +248,21 @@ sub is_admin {
     my $self = shift;
     return $self->{_data}->{is_admin};
 }
+
+=head2 is_external
+
+Returns true if the user authentication is not from SQL
+
+    my $is = $user->is_external;
+
+=cut
+
+
+sub is_external {
+    my $self = shift;
+    return $self->{_data}->{is_external};
+}
+
 
 =head2 is_temporary
 
@@ -288,5 +316,31 @@ sub change_password {
         ." WHERE name=?");
     $sth->execute(sha1_hex($password), $self->name);
 }
-1;
 
+=head2 language
+
+  Updates or selects the language selected for an User
+
+    $user->language();
+
+  Arguments: lang
+
+=cut
+
+  sub language {
+    my $self = shift;
+    my $tongue = shift;
+    if (defined $tongue) {
+      my $sth= $$CON->dbh->prepare("UPDATE users set language=?"
+          ." WHERE name=?");
+      $sth->execute($tongue, $self->name);
+    }
+    else {
+      my $sth = $$CON->dbh->prepare(
+         "SELECT language FROM users WHERE name=? ");
+      $sth->execute($self->name);
+      return $sth->fetchrow();
+    }
+  }
+
+1;

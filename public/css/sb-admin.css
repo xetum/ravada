@@ -72,6 +72,11 @@ body {
     background-color: #000;
 }
 
+.dropdown:hover .dropdown-menu {
+        display: block;
+        margin-top: 0; // remove the gap so it doesn't close
+}
+
 .top-nav>.open>.dropdown-menu {
     float: left;
     position: absolute;
@@ -363,11 +368,10 @@ ul.alert-dropdown {
   position: fixed;
   right: 20px;
   top: 50px;
+  width: 350px;
+  z-index: 1;
 }
 
-#overNotifications :hover {
-  filter: opacity(30%);
-}
 
 #overNotifications div {
   margin: 8px;
@@ -375,6 +379,5 @@ ul.alert-dropdown {
   padding-top: 2px;
   padding-bottom: 2px;
   border-radius: 5px;
-  transition: all 0.5s ease;
 
 }

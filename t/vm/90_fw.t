@@ -202,7 +202,7 @@ sub test_fw_ssh {
     die "No domain ip for ".$domain->name   if !$domain_ip;
 
     test_chain($vm_name, $local_ip, $public_port, $remote_ip,1);
-    test_chain_prerouting($vm_name, $local_ip, $port, $domain_ip, 1) 
+    test_chain_prerouting($vm_name, $local_ip, $port, $domain_ip, 1)
         or exit;
 
     eval { $domain->open_nat_ports( remote_ip => $remote_ip, user => $USER) };
@@ -241,6 +241,11 @@ for my $vm_name (qw( Void KVM )) {
     SKIP: {
         #TODO: find out if this system has iptables
         my $msg = "SKIPPED test: No $vm_name VM found ";
+        if ($vm && $>) {
+            $msg = "SKIPPED: Test must run as root";
+            $vm = undef;
+        }
+
         diag($msg)      if !$vm;
         skip $msg,10    if !$vm;
 

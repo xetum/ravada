@@ -1,5 +1,6 @@
 # Translators:
 # Fernando Verdugo <fv3rdugo@gmail.com>, 2017
+# Joel Alarcón <joelalju100@gmail.com>, 2017
 msgid ""
 msgstr ""
 "Project-Id-Version: 0.1.0-alpha\n"
@@ -41,7 +42,7 @@ msgstr "Parar"
 msgid "View"
 msgstr "Ver"
 
-msgid "Prepare Base"
+msgid "Prepare base"
 msgstr "Preparar base"
 
 msgid "Clone"
@@ -88,3 +89,127 @@ msgstr "Preferencias"
 
 msgid "New Machine"
 msgstr "Nueva máquina"
+
+msgid "I want to change my password"
+msgstr "Quiero cambiar mi contraseña"
+
+msgid "I want to change my language"
+msgstr "Quiero cambiar mi idioma"
+
+msgid "Language:"
+msgstr "Idioma:"
+
+msgid "English"
+msgstr "Inglés"
+
+msgid "Spanish"
+msgstr "Español"
+
+msgid "Catalan"
+msgstr "Catalán"
+
+msgid "New Password:"
+msgstr "Nueva Contraseña:"
+
+msgid "Confirm Password:"
+msgstr "Confirmar Contraseña:"
+
+msgid "Submit"
+msgstr "Enviar"
+
+msgid "Your language has been changed successfully"
+msgstr "Su idioma ha sido cambiado con éxito"
+
+msgid "Your password has been changed successfully"
+msgstr "Su contraseña ha sido cambiada con éxito"
+
+msgid "Password too small"
+msgstr "Contraseña demasiado pequeña"
+
+msgid "Password fields aren't equal"
+msgstr "Los campos de la contraseña no son iguales"
+
+msgid "Some of the password's fields are empty"
+msgstr "Algunos de los campos de la contraseña están vacíos"
+
+msgid "Public"
+msgstr "Público"
+
+msgid "Status"
+msgstr "Estado"
+
+msgid "Actions"
+msgstr "Acciones"
+
+msgid "Machines"
+msgstr "Máquinas"
+
+msgid "Down"
+msgstr "Parada"
+
+msgid "Running"
+msgstr "En marcha"
+
+msgid "ShutDown"
+msgstr "Apagar"
+
+msgid "Screenshot"
+msgstr ""
+
+msgid "Paused"
+msgstr "Pausado"
+
+msgid "Machine locked by requested"
+msgstr "Máquina bloqueada por"
+
+msgid "process"
+msgstr "proceso"
+
+msgid "Copy"
+msgstr "Copia"
+
+msgid "Admin tools"
+msgstr ""
+
+msgid "Remove base"
+msgstr "Elimina base"
+
+msgid "public"
+msgstr "pública"
+
+msgid "Restore"
+msgstr "Restaura"
+
+msgid "Hybernate"
+msgstr "Hiberna"
+
+msgid "Shutdown"
+msgstr "Apagar"
+
+msgid "action"
+msgstr "acción"
+
+msgid "will remove all the contents of the machine"
+msgstr "borrará todo el contenido de la máquina"
+
+msgid "Are you sure?"
+msgstr "Estas seguro/a?"
+
+msgid "Yes"
+msgstr "Si"
+
+msgid "No"
+msgstr ""
+
+msgid "Make public"
+msgstr "Haz público"
+
+msgid "Machine settings"
+msgstr "Preferencias de la máquina"
+
+msgid "Cannot remove base, machine has clones"
+msgstr "No se puede borrar la base, la máquina tiene clones"
+
+msgid "Show/Hide clones"
+msgstr "Ver/Esconde clones"
+>>>>>>> master

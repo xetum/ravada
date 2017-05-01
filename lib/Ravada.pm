@@ -3,7 +3,7 @@ package Ravada;
 use warnings;
 use strict;
 
-our $VERSION = '0.1.0';
+our $VERSION = '0.2.5';
 
 use Carp qw(carp croak);
 use Data::Dumper;
@@ -14,7 +14,6 @@ use POSIX qw(WNOHANG);
 use YAML;
 
 use Socket qw( inet_aton inet_ntoa );
-use Sys::Hostname;
 
 use Ravada::Auth;
 use Ravada::Request;
@@ -43,14 +42,19 @@ our $CONFIG = {};
 our $DEBUG;
 our $CAN_FORK = 1;
 our $CAN_LXC = 0;
+
+# Seconds to wait for other long process
+our $SECONDS_WAIT_CHILDREN = 2;
+# Limit for long processes
 our $LIMIT_PROCESS = 2;
+our $LIMIT_HUGE_PROCESS = 1;
 
-# FAT commands take long
-our %FAT_COMMAND =  map { $_ => 1 } qw(prepare_base remove);
+our $DIR_SQL = "sql/mysql";
+$DIR_SQL = "/usr/share/doc/ravada/sql/mysql" if ! -e $DIR_SQL;
 
-# Priority Commands should not be run many at once because they may clash with each other
-# like opening iptables or accessing to disk
-our %PRIORITY_COMMAND = map { $_ => 1 } qw(create start);
+# LONG commands take long
+our %HUGE_COMMAND = map { $_ => 1 } qw(download);
+our %LONG_COMMAND =  map { $_ => 1 } (qw(prepare_base remove_base screenshot ), keys %HUGE_COMMAND);
 
 has 'vm' => (
           is => 'ro'
@@ -66,6 +70,12 @@ has 'connector' => (
 has 'config' => (
     is => 'ro'
     ,isa => 'Str'
+);
+
+has 'warn_error' => (
+    is => 'rw'
+    ,isa => 'Bool'
+    ,default => sub { 1 }
 );
 
 =head2 BUILD
@@ -90,7 +100,164 @@ sub BUILD {
         $self->connector($CONNECTOR);
     }
     Ravada::Auth::init($CONFIG);
+    $self->_create_tables();
+    $self->_upgrade_tables();
+    $self->_update_data();
 }
+
+sub _update_isos {
+    my $self = shift;
+    my $table = 'iso_images';
+    my $field = 'name';
+    my %data = (
+        zesty => {
+                    name => 'Ubuntu Zesty Zapus'
+            ,description => 'Ubuntu 17.04 Zesty Zapus 64 bits'
+                   ,arch => 'amd64'
+                    ,xml => 'yakkety64-amd64.xml'
+             ,xml_volume => 'yakkety64-volume.xml'
+                    ,url => 'http://releases.ubuntu.com/17.04/'
+                ,file_re => ,'ubuntu-17.04.*desktop-amd64.iso'
+                ,md5_url => ,'http://releases.ubuntu.com/17.04/MD5SUMS'
+        }
+        ,serena64 => {
+            name => 'Mint 18.1 Mate 64 bits'
+    ,description => 'Mint Serena 18.1 with Mate Desktop based on Ubuntu Xenial 64 bits'
+           ,arch => 'amd64'
+            ,xml => 'xenial64-amd64.xml'
+     ,xml_volume => 'xenial64-volume.xml'
+            ,url => 'http://mirrors.evowise.com/linuxmint/stable/18.1/'
+        ,file_re => 'linuxmint-18.1-mate-64bit.iso'
+        ,md5_url => ''
+            ,md5 => 'c5cf5c5d568e2dfeaf705cfa82996d93'
+
+        }
+
+    );
+
+    my $sth_search = $CONNECTOR->dbh->prepare("SELECT id FROM $table WHERE $field = ?");
+    for my $name (keys %data) {
+        my $row = $data{$name};
+        $sth_search->execute($row->{$field});
+        my ($id) = $sth_search->fetchrow;
+        next if $id;
+        warn("INFO: updating $table : $row->{$field}\n")
+            if $0 !~/\.t$/;
+
+        my $sql =
+            "INSERT INTO iso_images "
+            ."("
+            .join(" , ", sort keys %{$data{$name}})
+            .")"
+            ." VALUES ( "
+            .join(" , ", map { "?" } keys %{$data{$name}})
+            ." )"
+        ;
+        my $sth = $CONNECTOR->dbh->prepare($sql);
+        $sth->execute(map { $data{$name}->{$_} } sort keys %{$data{$name}});
+        $sth->finish;
+    }
+}
+
+sub _update_data {
+    my $self = shift;
+    $self->_update_isos();
+}
+
+sub _upgrade_table {
+    my $self = shift;
+    my ($table, $field, $definition) = @_;
+    my $dbh = $CONNECTOR->dbh;
+
+    my $sth = $dbh->column_info(undef,undef,$table,$field);
+    my $row = $sth->fetchrow_hashref;
+    $sth->finish;
+    return if $row;
+
+    warn "INFO: adding $field $definition to $table\n";
+    $dbh->do("alter table $table add $field $definition");
+    return 1;
+}
+
+sub _create_table {
+    my $self = shift;
+    my $table = shift;
+
+    my $sth = $CONNECTOR->dbh->table_info('%',undef,$table,'TABLE');
+    my $info = $sth->fetchrow_hashref();
+    $sth->finish;
+    return if keys %$info;
+
+    warn "INFO: creating table $table\n";
+    my $file_sql = "$DIR_SQL/$table.sql";
+    open my $in,'<',$file_sql or die "$! $file_sql";
+    my $sql = join " ",<$in>;
+    close $in;
+
+    $CONNECTOR->dbh->do($sql);
+    return 1;
+}
+
+sub _insert_data {
+    my $self = shift;
+    my $table = shift;
+
+    my $file_sql =  "$DIR_SQL/../data/insert_$table.sql";
+    return if ! -e $file_sql;
+
+    warn "INFO: inserting data for $table\n";
+    open my $in,'<',$file_sql or die "$! $file_sql";
+    my $sql = '';
+    while (my $line = <$in>) {
+        $sql .= $line;
+        next if $sql !~ /\w/ || $sql !~ /;\s*$/;
+        $CONNECTOR->dbh->do($sql);
+        $sql = '';
+    }
+    close $in;
+
+}
+
+sub _create_tables {
+    my $self = shift;
+    return if $CONNECTOR->dbh->{Driver}{Name} !~ /mysql/i;
+
+    opendir my $ls,$DIR_SQL or die "$! $DIR_SQL";
+    while (my $file = readdir $ls) {
+        my ($table) = $file =~ m{(.*)\.sql$};
+        next if !$table;
+        $self->_insert_data($table)     if $self->_create_table($table);
+    }
+    closedir $ls;
+}
+
+sub _upgrade_tables {
+    my $self = shift;
+    return if $CONNECTOR->dbh->{Driver}{Name} !~ /mysql/i;
+
+    $self->_upgrade_table('file_base_images','target','varchar(64) DEFAULT NULL');
+    $self->_upgrade_table('vms','vm_type',"char(20) NOT NULL DEFAULT 'KVM'");
+    $self->_upgrade_table('requests','at_time','int(11) DEFAULT NULL');
+
+    $self->_upgrade_table('iso_images','md5_url','varchar(255)');
+    $self->_upgrade_table('iso_images','file_re','char(64)');
+    $self->_upgrade_table('iso_images','device','varchar(255)');
+
+    $self->_upgrade_table('users','language','char(3) DEFAULT NULL');
+    if ( $self->_upgrade_table('users','is_external','int(11) DEFAULT 0')) {
+        my $sth = $CONNECTOR->dbh->prepare(
+            "UPDATE users set is_external=1 WHERE password='*LK* no pss'"
+        );
+        $sth->execute;
+    }
+
+    $self->_upgrade_table('networks','requires_password','int(11)');
+
+    $self->_upgrade_table('domains','spice_password','varchar(20) DEFAULT NULL');
+    $self->_upgrade_table('domains','has_spice','int(11) DEFAULT NULL');
+    $self->_upgrade_table('domains','has_x2go','int(11) DEFAULT NULL');
+}
+
 
 sub _connect_dbh {
     my $driver= ($CONFIG->{db}->{driver} or 'mysql');;
@@ -110,6 +277,7 @@ Returns the default display IP read from the config file
 =cut
 
 sub display_ip {
+
     my $ip = $CONFIG->{display_ip};
 
     return $ip if $ip;
@@ -176,7 +344,7 @@ sub _connect_vm {
 
     my @vms;
     eval { @vms = $self->vm };
-    warn $@ if $@;
+    warn $@ if $@ && $self->warn_error;
     return if $@ && $@ =~ /No VMs found/i;
     die $@ if $@;
 
@@ -212,7 +380,7 @@ sub _create_vm {
         $err .= "\n$err_lxc" if $err_lxc;
     }
     if (!@vms) {
-        warn "No VMs found: $err\n";
+        warn "No VMs found: $err\n" if $self->warn_error;
     }
     return \@vms;
 
@@ -263,7 +431,7 @@ sub create_domain {
     my $vm_name = $args{vm};
     delete $args{vm};
 
-    my $request = $args{request}            if $args{request};
+    my $request = ( $args{request} or undef);
 
     my $vm;
     if ($vm_name) {
@@ -555,6 +723,25 @@ sub remove_volume {
 
 }
 
+=head2 clean_killed_requests
+
+Before processing requests, old killed requests must be cleaned.
+
+=cut
+
+sub clean_killed_requests {
+    my $self = shift;
+    my $sth = $CONNECTOR->dbh->prepare("SELECT id FROM requests "
+        ." WHERE status <> 'done' AND STATUS <> 'requested'"
+    );
+    $sth->execute;
+    while (my ($id) = $sth->fetchrow) {
+        my $req = Ravada::Request->open($id);
+        $req->status("done","Killed ".$req->command." before completion");
+    }
+
+}
+
 =head2 process_requests
 
 This is run in the ravada backend. It processes the commands requested by the fronted
@@ -567,21 +754,40 @@ sub process_requests {
     my $self = shift;
     my $debug = shift;
     my $dont_fork = shift;
+    my $long_commands = (shift or 0);
+    my $short_commands = (shift or 0);
 
     $self->_wait_pids_nohang();
-    $self->_check_vms();
 
     my $sth = $CONNECTOR->dbh->prepare("SELECT id,id_domain FROM requests "
-        ." WHERE status='requested' OR status like 'retry %' OR status='waiting'"
+        ." WHERE "
+        ."    ( status='requested' OR status like 'retry %' OR status='waiting')"
+        ."   AND ( at_time IS NULL  OR at_time = 0 OR at_time<=?) "
         ." ORDER BY date_req"
     );
-    $sth->execute;
+    $sth->execute(time);
+
+    my $debug_type = '';
+    $debug_type = 'long' if $long_commands;
+    $debug_type = 'short' if $short_commands || !$long_commands;
+    $debug_type = 'all' if $long_commands && $short_commands;
+
     while (my ($id_request,$id_domain)= $sth->fetchrow) {
         my $req = Ravada::Request->open($id_request);
-        next if $self->_domain_working($id_domain, $id_request);
-        $self->_wait_pids_nohang();
 
-        warn "executing request ".$req->id." ".$req->status()." ".$req->command
+        if ( ($long_commands && 
+                (!$short_commands && !$LONG_COMMAND{$req->command}))
+            ||(!$long_commands && $LONG_COMMAND{$req->command})
+        ) {
+            warn "[$debug_type,$long_commands,$short_commands] $$ skipping request "
+                .$req->command  if $DEBUG;
+            next;
+        }
+        next if $req->command !~ /shutdown/i
+            && $self->_domain_working($id_domain, $id_request);
+
+        warn "[$debug_type] $$ executing request ".$req->id." ".$req->status()." "
+            .$req->command
             ." ".Dumper($req->args) if $DEBUG || $debug;
 
         my ($n_retry) = $req->status() =~ /retry (\d+)/;
@@ -598,10 +804,40 @@ sub process_requests {
 
         sleep 1;
         warn "req ".$req->id." , command: ".$req->command." , status: ".$req->status()
-            ." , error: '".($req->error or 'NONE')."'";
+            ." , error: '".($req->error or 'NONE')."'\n"  if $DEBUG;
 
     }
     $sth->finish;
+
+}
+
+=head2 process_long_requests
+
+Process requests that take log time. It will fork on each one
+
+=cut
+
+sub process_long_requests {
+    my $self = shift;
+    my ($debug,$dont_fork) = @_;
+
+    $self->_disconnect_vm();
+    return $self->process_requests($debug, $dont_fork, 1);
+}
+
+=head2 process_all_requests
+
+Process all the requests, long and short
+
+=cut
+
+sub process_all_requests {
+
+    my $self = shift;
+    my ($debug,$dont_fork) = @_;
+
+    $self->process_requests($debug, $dont_fork,1,1);
+
 }
 
 sub _domain_working {
@@ -634,6 +870,13 @@ sub _domain_working {
     return $id;
 }
 
+sub _process_all_requests_dont_fork {
+    my $self = shift;
+    my $debug = shift;
+
+    return $self->process_requests($debug,1, 1, 1);
+}
+
 sub _process_requests_dont_fork {
     my $self = shift;
     my $debug = shift;
@@ -654,7 +897,7 @@ sub list_vm_types {
             my ($name) = ref($vm) =~ /.*::(.*)/;
             $type{$name}++;
     }
-    return sort keys %type;
+    return keys %type;
 }
 
 sub _execute {
@@ -667,11 +910,7 @@ sub _execute {
     confess "Unknown command ".$request->command
             if !$sub;
 
-    $self->_disconnect_vm();
-
-    if ($dont_fork || !$CAN_FORK ) {
-        # TODO check if that can be done with _do_execute_command like when forking
-        $self->_connect_vm();
+    if ($dont_fork || !$CAN_FORK || !$LONG_COMMAND{$request->command}) {
 
         eval { $sub->($self,$request) };
         my $err = ($@ or '');
@@ -680,15 +919,17 @@ sub _execute {
         return $err;
     }
 
-    if ( $FAT_COMMAND{$request->command} ) {
-        return if $self->_wait_children($request) 
-    }
-    $self->_wait_other_prioris($request) if $PRIORITY_COMMAND{$request->command};
+    $self->_wait_pids_nohang();
+    return if $self->_wait_children($request);
+
     $request->status('working');
     my $pid = fork();
     die "I can't fork" if !defined $pid;
-    $self->_do_execute_command($sub, $request) if $pid == 0;
-    $self->_add_pid($pid, $request->id);
+    if ( $pid == 0 ) {
+        $self->_do_execute_command($sub, $request) 
+    } else {
+        $self->_add_pid($pid, $request->id);
+    }
 #    $self->_connect_vm_kvm();
     return '';
 }
@@ -773,38 +1014,30 @@ sub _cmd_create{
 
 }
 
-sub _wait_other_prioris {
-    my $self = shift;
-    my $req = shift;
-
-    # In 2 seconds we return no matter what, these are priority commands damn !
-    for (1 .. 2) {
-        my $count = 0;
-        for my $pid (sort keys %{$self->{pids}}) {
-            my $id_req = $self->{pids}->{$pid};
-            my $req = Ravada::Request->open($id_req);
-            if ($PRIORITY_COMMAND{$req->command}) {
-                warn "INFO: Must wait for ".$req->command." ".Dumper($req->{args});
-                $count++;
-            }
-        }
-        return if !$count;
-        sleep 1;
-    }
-}
-
 sub _wait_children {
     my $self = shift;
     my $req = shift or confess "Missing request";
 
     my $try = 0;
-    for ( 1 .. 10 ) {
+    for ( 1 .. $SECONDS_WAIT_CHILDREN ) {
         my $n_pids = scalar keys %{$self->{pids}};
-        my $msg = $req->id." ".$req->command." waiting for processes to finish $n_pids of $LIMIT_PROCESS running";
-        warn $msg if $DEBUG;
 
-        return if $n_pids < $LIMIT_PROCESS;
-
+        my $msg;
+        if ($HUGE_COMMAND{$req->command}) {
+            if ( $n_pids < $LIMIT_HUGE_PROCESS) {
+                $msg = $req->id." ".$req->command
+                ." waiting for processes to finish $n_pids"
+                ." of $LIMIT_HUGE_PROCESS ";
+                warn $msg if $DEBUG;
+                return;
+            }
+        } elsif ( $n_pids < $LIMIT_PROCESS) {
+            $msg = $req->id." ".$req->command
+                ." waiting for processes to finish $n_pids"
+                ." of $LIMIT_PROCESS ";
+            warn $msg if $DEBUG;
+            return;
+        }
         $self->_wait_pids_nohang();
         sleep 1;
 
@@ -824,7 +1057,7 @@ sub _wait_pids_nohang {
         my $kid = waitpid($pid , WNOHANG);
         next if !$kid || $kid == -1;
         $self->_set_req_done($kid);
-        delete $self->{pids}->{$kid};
+        $self->_delete_pid($kid);
     }
 
 }
@@ -856,7 +1089,7 @@ sub _wait_pids {
 #        warn "Found $kid";
         $self->_set_req_done($pid);
 
-        delete $self->{pids}->{$kid};
+        $self->_delete_pid($kid);
         return if $kid  == $pid;
     }
 }
@@ -867,6 +1100,14 @@ sub _add_pid {
     my $id_req = shift;
 
     $self->{pids}->{$pid} = $id_req;
+
+}
+
+sub _delete_pid {
+    my $self = shift;
+    my $pid = shift;
+
+    delete $self->{pids}->{$pid};
 }
 
 sub _cmd_remove {
@@ -993,6 +1234,43 @@ sub _cmd_remove_base {
 }
 
 
+sub _cmd_hybernate {
+    my $self = shift;
+    my $request = shift;
+
+    my $uid = $request->args('uid') or confess "Missing argument uid";
+    my $id_domain = $request->id_domain or confess "Missing request id_domain";
+
+    my $user = Ravada::Auth::SQL->search_by_id( $uid);
+    my $domain = $self->search_domain_by_id($id_domain);
+
+    die "Unknown domain id '$id_domain'\n" if !$domain;
+
+    $domain->hybernate($user);
+
+}
+
+sub _cmd_download {
+    my $self = shift;
+    my $request = shift;
+
+    my $id_iso = $request->args('id_iso')
+        or confess "Missing argument id_iso";
+
+    my $vm;
+    $vm = Ravada::VM->open($request->args('id_vm')) if $request->defined_arg('id_vm');
+    $vm = $self->search_vm('KVM')   if !$vm;
+
+    my $delay = $request->defined_arg('delay');
+    sleep $delay if $delay;
+
+    my $iso = $vm->_search_iso($id_iso);
+    if ($iso->{device} && -e $iso->{device}) {
+        $request->status('done',"$iso->{device} already downloaded");
+        return;
+    }
+    my $device_cdrom = $vm->_iso_name($iso, $request);
+}
 
 sub _cmd_shutdown {
     my $self = shift;
@@ -1010,6 +1288,23 @@ sub _cmd_shutdown {
 
     $domain->shutdown(timeout => $timeout, name => $name, user => $user
                     , request => $request);
+
+}
+
+sub _cmd_force_shutdown {
+    my $self = shift;
+    my $request = shift;
+
+    my $uid = $request->args('uid');
+    my $name = $request->args('name');
+
+    my $domain;
+    $domain = $self->search_domain($name);
+    die "Unknown domain '$name'\n" if !$domain;
+
+    my $user = Ravada::Auth::SQL->search_by_id( $uid);
+
+    $domain->force_shutdown($user,$request);
 
 }
 
@@ -1062,7 +1357,25 @@ sub _cmd_nat_ports {
             && !$user->is_admin;
 
     $domain->open_nat_ports(remote_ip => $request->args('remote_ip'), user => $user);
-    
+
+}
+
+sub _cmd_set_driver {
+    my $self = shift;
+    my $request = shift;
+
+    my $uid = $request->args('uid');
+    my $id_domain = $request->args('id_domain') or die "ERROR: Missing id_domain";
+
+    my $user = Ravada::Auth::SQL->search_by_id($uid);
+    my $domain = $self->search_domain_by_id($id_domain);
+
+    confess "Unkown domain ".Dumper($request)   if !$domain;
+
+    die "USER $uid not authorized to set driver for domain ".$domain->name
+        if $domain->id_owner != $user->id && !$user->is_admin;
+
+    $domain->set_driver_id($request->args('id_option'));
 }
 
 sub _req_method {
@@ -1076,8 +1389,11 @@ sub _req_method {
         ,create => \&_cmd_create
         ,remove => \&_cmd_remove
         ,resume => \&_cmd_resume
+      ,download => \&_cmd_download
       ,shutdown => \&_cmd_shutdown
      ,nat_ports => \&_cmd_nat_ports
+     ,hybernate => \&_cmd_hybernate
+    ,set_driver => \&_cmd_set_driver
     ,domdisplay => \&_cmd_domdisplay
     ,screenshot => \&_cmd_screenshot
    ,remove_base => \&_cmd_remove_base
@@ -1086,6 +1402,7 @@ sub _req_method {
  ,rename_domain => \&_cmd_rename_domain
  ,open_iptables => \&_cmd_open_iptables
  ,list_vm_types => \&_cmd_list_vm_types
+,force_shutdown => \&_cmd_force_shutdown
     );
     return $methods{$cmd};
 }

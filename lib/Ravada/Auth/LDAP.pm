@@ -3,6 +3,12 @@ package Ravada::Auth::LDAP;
 use strict;
 use warnings;
 
+=head1 NAME
+
+Ravada::Auth::LDAP - LDAP library for Ravada
+
+=cut
+
 use Authen::Passphrase;
 use Authen::Passphrase::SaltedDigest;
 use Carp qw(carp);
@@ -291,7 +297,7 @@ sub _check_user_profile {
     my $user_sql = Ravada::Auth::SQL->new(name => $self->name);
     return if $user_sql->id;
 
-    Ravada::Auth::SQL::add_user(name => $self->name);
+    Ravada::Auth::SQL::add_user(name => $self->name, is_external => 1, is_temporary => 0);
 }
 
 sub _match_password {
@@ -388,8 +394,7 @@ sub is_admin {
     my $self = shift;
     my $verbose = shift;
 
-    my $admin_group =  $$CONFIG->{ldap}->{admin_group}
-        or die "ERROR: Missing ldap -> admin_group entry in the config file\n";
+    my $admin_group =  $$CONFIG->{ldap}->{admin_group} or return;
     my $group = search_group(name => $admin_group)
         or do {
             warn "WARNING: I can't find group $admin_group in the LDAP directory\n"

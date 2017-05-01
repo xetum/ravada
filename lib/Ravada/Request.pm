@@ -3,6 +3,12 @@ package Ravada::Request;
 use strict;
 use warnings;
 
+=head1 NAME
+
+Ravada::Request - Requests library for Ravada
+
+=cut
+
 use Carp qw(confess);
 use Data::Dumper;
 use JSON::XS;
@@ -30,6 +36,7 @@ our %VALID_ARG = (
     create_domain => {
               vm => 1
            ,name => 1
+           ,swap => 2
          ,id_iso => 1
         ,id_base => 1
        ,id_owner => 1
@@ -45,14 +52,18 @@ our %VALID_ARG = (
     ,resume_domain => {%$args_manage, remote_ip => 1 }
     ,remove_domain => $args_manage
     ,shutdown_domain => { name => 1, uid => 1, timeout => 2 }
+    ,force_shutdown_domain => { name => 1, uid => 1, at => 2 }
     ,screenshot_domain => { id_domain => 1, filename => 2 }
     ,start_domain => {%$args_manage, remote_ip => 1 }
     ,rename_domain => { uid => 1, name => 1, id_domain => 1}
     ,nat_ports => { uid => 1, id_domain => 1, remote_ip => 1}
+    ,set_driver => {uid => 1, id_domain => 1, id_option => 1}
+    ,hybernate=> {uid => 1, id_domain => 1}
+    ,download => {uid => 2, id_iso => 1, id_vm => 2, delay => 2}
 );
 
 our %CMD_SEND_MESSAGE = map { $_ => 1 }
-    qw( create start shutdown prepare_base remove remove_base rename_domain screenshot);
+    qw( create start shutdown prepare_base remove remove_base rename_domain screenshot download);
 
 our $CONNECTOR;
 
@@ -66,7 +77,7 @@ sub _init_connector {
 
     Internal object builder, do not call
 
-=Cut
+=cut
 
 sub BUILD {
     _init_connector();
@@ -105,8 +116,8 @@ sub open {
     confess "I can't find id=$id " if !defined $row;
     $sth->finish;
 
-    my $args = decode_json($row->{args}) if $row->{args};
-    $args = {} if !$args;
+    my $args = {};
+    $args = decode_json($row->{args}) if $row->{args};
 
     $row->{args} = $args;
 
@@ -241,6 +252,8 @@ sub _check_args {
     my $args = { @_ };
 
     my $valid_args = $VALID_ARG{$sub};
+
+    confess "Unknown method $sub" if !$valid_args;
     for (keys %{$args}) {
         confess "Invalid argument $_ , valid args ".Dumper($valid_args)
             if !$valid_args->{$_};
@@ -252,6 +265,26 @@ sub _check_args {
     }
 
     return $args;
+}
+
+=head2 force_shutdown_domain
+
+Requests to stop a domain now !
+
+  my $req = Ravada::Request->shutdown_domain( name => 'name' , uid => $user->id );
+
+=cut
+
+sub force_shutdown_domain {
+    my $proto = shift;
+    my $class=ref($proto) || $proto;
+
+    my $args = _check_args('force_shutdown_domain', @_ );
+
+    my $self = {};
+    bless($self,$class);
+
+    return $self->_new_request(command => 'force_shutdown' , args => $args);
 }
 
 =head2 shutdown_domain
@@ -388,6 +421,7 @@ sub _new_request {
     if ( ref $args{args} ) {
         $args{args}->{uid} = $args{args}->{id_owner}
             if !exists $args{args}->{uid};
+        $args{at_time} = $args{args}->{at} if exists $args{args}->{at};
         $args{args} = encode_json($args{args});
     }
     _init_connector()   if !$CONNECTOR || !$$CONNECTOR;
@@ -468,7 +502,7 @@ sub status {
     $sth->execute($status, $self->{id});
     $sth->finish;
 
-    $self->_send_message($status, $message) 
+    $self->_send_message($status, $message)
         if $CMD_SEND_MESSAGE{$self->command} || $self->error ;
     return $status;
 }
@@ -503,12 +537,15 @@ sub _send_message {
 
     $self->_remove_unnecessary_messages() if $self->status eq 'done';
 
+    my $subject = $self->command." $domain_name ".$self->status;
+    $subject = $message if $message && $self->status eq 'done'
+            && length ($message)<60;
+
     my $sth = $$CONNECTOR->dbh->prepare(
-        "INSERT INTO messages ( id_user, id_request, subject, message ) "
-        ." VALUES ( ?,?,?,?)"
+        "INSERT INTO messages ( id_user, id_request, subject, message, date_shown ) "
+        ." VALUES ( ?,?,?,?, NULL)"
     );
-    $sth->execute($uid, $self->id,"Command ".$self->command." $domain_name".$self->status
-        ,$message);
+    $sth->execute($uid, $self->id,$subject, $message);
     $sth->finish;
 }
 
@@ -519,7 +556,7 @@ sub _remove_unnecessary_messages {
     $uid = $self->defined_arg('id_owner');
     $uid = $self->defined_arg('uid')        if !$uid;
     return if !$uid;
-    
+
 
     my $sth = $$CONNECTOR->dbh->prepare(
         "DELETE FROM messages WHERE id_user=? AND id_request=? "
@@ -642,7 +679,7 @@ sub screenshot_domain {
     bless($self,$class);
 
     return $self->_new_request(command => 'screenshot' , id_domain => $args->{id_domain}
-        ,args => encode_json($args));
+        ,args => $args);
 
 }
 
@@ -664,7 +701,7 @@ sub open_iptables {
     return $self->_new_request(
             command => 'open_iptables'
         , id_domain => $args->{id_domain}
-             , args => encode_json($args));
+             , args => $args);
 }
 
 =head2 rename_domain
@@ -717,6 +754,85 @@ sub nat_ports {
              , args => encode_json($args)
     );
 
+}
+
+=head2 set_driver
+
+Sets a driver to a domain
+
+    $domain->set_driver(
+        id_domain => $domain->id
+        ,uid => $USER->id
+        ,id_driver => $driver->id
+    );
+
+=cut
+
+sub set_driver {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+
+    my $args = _check_args('set_driver', @_ );
+
+    my $self = {};
+    bless($self,$class);
+
+    return $self->_new_request(
+            command => 'set_driver'
+        , id_domain => $args->{id_domain}
+             , args => encode_json($args)
+    );
+
+}
+
+=head2 hybernate
+
+Hybernates a domain.
+
+    Ravada::Request->hybernate(
+        id_domain => $domain->id
+             ,uid => $user->id
+    );
+
+=cut
+
+sub hybernate {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+
+    my $args = _check_args('hybernate', @_ );
+
+    my $self = {};
+    bless($self,$class);
+
+    return $self->_new_request(
+            command => 'hybernate'
+        , id_domain => $args->{id_domain}
+             , args => encode_json($args)
+    );
+
+}
+
+=head2 download
+
+Downloads a file. Actually used only to download iso images
+for KVM domains.
+
+=cut
+
+sub download {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+
+    my $args = _check_args('download', @_ );
+
+    my $self = {};
+    bless($self,$class);
+
+    return $self->_new_request(
+            command => 'download'
+             , args => encode_json($args)
+    );
 
 }
 

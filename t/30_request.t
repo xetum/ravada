@@ -83,8 +83,10 @@ sub test_req_start_domain {
             or return ;
     ok(!$req->error,"Error ".$req->error." creating domain ".$name) 
             or return ;
-    test_unread_messages($USER,1, "[$vm_name] create domain $name");
-    
+
+    my $n_expected = 1;
+    test_unread_messages($USER, $n_expected, "[$vm_name] create domain $name");
+
 }
 
 sub test_req_create_domain_iso {
@@ -124,7 +126,9 @@ sub test_req_create_domain_iso {
     ok($req->status eq 'done'
         ,"Status of request is ".$req->status." it should be done") or return ;
     ok(!$req->error,"Error ".$req->error." creating domain ".$name) or return ;
-    test_unread_messages($USER,1, "[$vm_name] create domain $name");
+
+    my $n_expected = 1;
+    test_unread_messages($USER, $n_expected, "[$vm_name] create domain $name");
 
     my $req2 = Ravada::Request->open($req->id);
     ok($req2->{id} == $req->id,"iso req2->{id} = ".$req2->{id}." , expecting ".$req->id);
@@ -195,7 +199,10 @@ sub test_req_remove_domain_name {
 
     my $req = Ravada::Request->remove_domain(name => $name, uid => user_admin()->id);
 
-    $ravada->_process_requests_dont_fork();
+    rvd_back->_process_all_requests_dont_fork();
+
+    ok($req->status eq 'done',ref($vm)." status ".$req->status." should be done");
+    ok(!$req->error ,ref($vm)." error : '".$req->error."' , should be ''");
 
     my $domain =  $vm->search_domain($name);
     ok(!$domain,ref($vm)." Domain $name should be removed") or exit;
@@ -232,6 +239,10 @@ for my $vm_name ( qw(Void KVM)) {
 
     SKIP: {
         my $msg = "SKIPPED: No virtual managers found";
+        if ($vm && $vm_name =~ /kvm/i && $>) {
+            $msg = "SKIPPED: Test must run as root";
+            $vm = undef;
+        }
         skip($msg,10)   if !$vm;
     
         diag("Testing requests with ".(ref $vm or '<UNDEF>'));
