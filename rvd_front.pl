@@ -99,7 +99,7 @@ hook before_routes => sub {
   my $url = $c->req->url->to_abs->path;
   $c->stash(css=>['/css/sb-admin.css']
             ,js=>[
-                ,'/js/ravada.js'
+                '/js/ravada.js'
                 ]
             ,csssnippets => []
             ,navbar_custom => 0
