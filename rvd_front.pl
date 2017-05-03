@@ -1133,9 +1133,6 @@ sub settings_machine {
     $c->stash(domain => $domain);
     $c->stash(USER => $USER);
 
-    my $req = Ravada::Request->shutdown_domain(name => $domain->name, uid => $USER->id)
-            if $c->param('shutdown') && $domain->is_active;
-
     $req = Ravada::Request->start_domain(
                         uid => $USER->id
                      , name => $domain->name
