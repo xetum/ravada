@@ -8,6 +8,7 @@ use Test::More;
 use Test::SQL::Data;
 
 use feature qw(signatures);
+no warnings "experimental::signatures";
 
 use lib 't/lib';
 use Test::Ravada;
@@ -90,6 +91,7 @@ sub test_domain_display_req($vm_name) {
             ,id_domain => $domain0->id
             );
             rvd_back->_process_all_requests_dont_fork();
+            is($req->error,'');
             my $domain = $vm->search_domain($domain0->name);
             is($domain->has_display($type),$value);
 
