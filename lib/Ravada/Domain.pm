@@ -362,8 +362,15 @@ sub id {
 sub _data {
     my $self = shift;
     my $field = shift or confess "Missing field name";
+    my $value = shift;
+
+    confess "ERROR: I can'set $field to '$value' in readonly\n"
+        if defined $value && $self->readonly;
 
     _init_connector();
+
+    $self->_update_data($field,$value)
+        if defined $value;
 
     return $self->{_data}->{$field} if exists $self->{_data}->{$field};
     $self->{_data} = $self->_select_domain_db( name => $self->name);
@@ -372,6 +379,18 @@ sub _data {
     confess "No field $field in domains"            if !exists$self->{_data}->{$field};
 
     return $self->{_data}->{$field};
+}
+
+sub _update_data {
+    my $self = shift;
+    my ($field,$value) = @_;
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "UPDATE domains set $field=? "
+        ." WHERE id=?"
+    );
+    $sth->execute($value, $self->id);
+    $self->{_data} = $self->_select_domain_db( id => $self->id);
 }
 
 sub __open {
@@ -680,15 +699,18 @@ sub has_clones {
 }
 
 sub has_rdp {
-    return $_[0]->_data('has_rdp');
+    my $self = shift;
+    return $self->_data('has_rdp',@_);
 }
 
 sub has_spice {
-    return $_[0]->_data('has_spice');
+    my $self = shift;
+    return $self->_data('has_spice',@_);
 }
 
 sub has_x2go{
-    return $_[0]->_data('has_x2go');
+    my $self = shift;
+    return $self->_data('has_x2go', @_);
 }
 
 =head2 list_files_base

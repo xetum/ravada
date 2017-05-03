@@ -41,6 +41,26 @@ sub test_domain_display($vm_name){
     ok($domain_f->has_spice());
     ok(!$domain_f->has_x2go());
 
+    is($domain->has_spice(),1);
+
+    for my $val (0,1) {
+        is($domain->has_spice($val),$val);
+        is($domain->has_spice(),$val);
+        $domain_f = rvd_front->search_domain($domain->name);
+        is($domain_f->has_spice(),$val);
+
+        is($domain->has_x2go($val) ,$val);
+        is($domain->has_x2go() ,$val);
+        $domain_f = rvd_front->search_domain($domain->name);
+        is($domain_f->has_x2go(), $val);
+
+        is($domain->has_rdp($val) ,$val);
+        is($domain->has_rdp() ,$val);
+        $domain_f = rvd_front->search_domain($domain->name);
+        is($domain_f->has_rdp(), $val);
+
+    }
+
 }
 #################################################################
 

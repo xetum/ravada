@@ -813,6 +813,35 @@ sub hybernate {
 
 }
 
+=head2 set_display
+
+Enables or disables a display type
+
+    my $req = Ravada::Request->set_display(
+        id_domain => $domain->id
+            , uid => $user->id
+         ,spice => 1
+          ,x2go => 0
+           ,rdp => 1
+    );
+
+=cut
+
+sub set_display {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my $args = _check_args('set_display',@_);
+
+    my $self = { };
+    bless($self, $class);
+
+    return $self->_new_request(
+            command => 'set_display'
+         ,id_domain => $args->{id_domain}
+              ,args => encode_json($args)
+    );
+}
+
 =head2 download
 
 Downloads a file. Actually used only to download iso images
