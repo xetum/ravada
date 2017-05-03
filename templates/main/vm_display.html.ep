@@ -1,0 +1,15 @@
+<div class="panel panel-primary" id="display">
+    <div class="panel-heading"><%=l 'Display' %></div>
+
+        <div class="panel-body">
+
+            Select the display type
+
+            <form method="post">
+                <input type="checkbox" name="spice"/>Spice<br/>
+                <input type="checkbox" name="x2go">X2Go<br/>
+                <input type="checkbox" name="rdp">Windows RDP<br/>
+            </form>
+        </div>
+    </div>
+</div>
