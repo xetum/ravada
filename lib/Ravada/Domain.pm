@@ -19,6 +19,7 @@ use Moose::Role;
 use Sys::Statistics::Linux;
 use IPTables::ChainMgr;
 use feature qw(signatures);
+no warnings "experimental::signatures";
 
 use Ravada::Domain::Driver;
 use Ravada::Utils;
@@ -28,6 +29,8 @@ our $CONNECTOR;
 
 our $MIN_FREE_MEMORY = 1024*1024;
 our $IPTABLES_CHAIN = 'RAVADA';
+
+our %ALLOW_SET_IN_RO = map { $_ => 1 } qw(has_spice has_x2go has_rdp);
 
 _init_connector();
 
@@ -363,23 +366,29 @@ sub id {
 sub _data {
     my $self = shift;
     my $field = shift or confess "Missing field name";
-    my $value = shift;
-
-    confess "ERROR: I can'set $field to '$value' in readonly\n"
-        if defined $value && $self->readonly;
+    my $new_value = shift;
 
     _init_connector();
 
-    $self->_update_data($field,$value)
-        if defined $value;
+    confess "ERROR: I can'set $field to '$new_value' in readonly\n"
+        if defined $new_value && $self->readonly && !$ALLOW_SET_IN_RO{$field};
 
-    return $self->{_data}->{$field} if exists $self->{_data}->{$field};
-    $self->{_data} = $self->_select_domain_db( name => $self->name);
-
+    my $value;
+    if ( exists $self->{_data}->{$field} ) {
+        $value = $self->{_data}->{$field};
+    } else {
+        $self->{_data} = $self->_select_domain_db( name => $self->name);
+        $value = $self->{_data}->{$field}   if $self->{_data};
+    }
     confess "No DB info for domain ".$self->name    if !$self->{_data};
     confess "No field $field in domains"            if !exists$self->{_data}->{$field};
 
-    return $self->{_data}->{$field};
+    if ( defined $new_value && (!defined $value || $value ne $new_value)) {
+        $self->_update_data($field,$new_value);
+        return $new_value;
+    }
+
+    return $value;
 }
 
 sub _update_data {
@@ -714,7 +723,11 @@ sub has_x2go{
     return $self->_data('has_x2go', @_);
 }
 
-sub has_display($self, $type, $value = undef) {
+sub has_display($self, $type) {
+    return $self->_data("has_$type");
+}
+
+sub set_display($self, $type, $value) {
     return $self->_data("has_$type", $value);
 }
 
