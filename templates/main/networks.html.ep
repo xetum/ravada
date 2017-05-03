@@ -30,6 +30,7 @@
         <th><%=l 'Description' %></th>
         <th><%=l 'All Domains' %></th>
         <th><%=l 'No Domains' %></th>
+        <th><%=l 'Requires Passwd' %></th>
       </tr>
     </thead>
     <tbody>
@@ -39,6 +40,8 @@
             <td>{{ network.description }}</td>
             <td>{{ network.all_domains }}</td>
             <td>{{ network.no_domains }}</td>
+            <td><p ng-show="{{network.requires_password}}" class="fa fa-lock" aria-hidden="true" title="User needed a password to connect">
+            <p ng-show="{{network.requires_password!=1}}" class="fa fa-unlock" aria-hidden="true" title="Password not required"></td>
         </tr>
     </tbody>
   </table>

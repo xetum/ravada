@@ -50,13 +50,15 @@ sub BUILD {
     my $description = $_[0]->{description};
     my $all_domains = $_[0]->{all_domains} ? 1 : 0; #when checkbox is not checked is NULL, change to 0
     my $no_domains = $_[0]->{no_domains} ? 1: 0;
+    my $n_order = $_[0]->{n_order};
+    my $requires_password = $_[0]->{requires_password} ? 1: 0;
 
     $name = "" unless defined $name;
 
     _init_connector();
     if ( $name ne '' ) {
 
-    my $row = $self -> _select_net_db( $name, $address, $description, $all_domains, $no_domains );
+    my $row = $self -> _select_net_db( $name, $address, $description, $all_domains, $no_domains, $n_order, $requires_password );
     };
 }
 =head2 allowed
@@ -197,13 +199,15 @@ sub _insert_net_db {
     my $description = shift;
     my $all_domains = shift;
     my $no_domains = shift;
+    my $n_order = shift;
+    my $requires_password = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
-        "INSERT INTO networks (name, address, description, all_domains, no_domains) "
-        ." VALUES(?,?,?,?,?)"
+        "INSERT INTO networks (name, address, description, all_domains, no_domains, n_order, requires_password) "
+        ." VALUES(?,?,?,?,?,?,?)"
     );
 
-    $sth->execute($name,$address,$description,$all_domains,$no_domains);
+    $sth->execute($name,$address,$description,$all_domains,$no_domains,$n_order,$requires_password);
     $sth->finish;
     return $self->_do_select_net_db( $name); ;
 }

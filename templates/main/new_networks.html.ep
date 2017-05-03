@@ -51,6 +51,13 @@
                     </label>
                 </div> 
 
+                <div class="pure-control-group">
+                    <label class="pure-checkbox">
+                    <input name="requires_password" id='requires_password' type="checkbox" value="1" >
+                    Requires password
+                    </label>
+                </div>
+
                 <div class="pure-controls">
                     <input type="submit" class="pure-button pure-button-primary" value="Submit"
                         ng-disabled="frm.$invalid" ></input>
