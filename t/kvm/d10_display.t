@@ -126,6 +126,45 @@ sub test_display_children($vm_name) {
             
             my $child_f = $vm->search_domain($child->name);
             is($child_f->has_display($type),$value);
+            $child->remove($USER);
+        }
+    }
+
+}
+
+sub test_display_ports($vm_name) {
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my $domain0 = $vm->create_domain( name => new_domain_name()
+        , id_iso => 1
+        , id_owner => $USER->id
+    );
+    my %used_port;
+    for my $type ( qw(spice rdp x2go)) {
+        for my $value ( 0 , 1 , 2) {
+            $domain0->set_display($type => $value);
+
+            my $domain = $vm->search_domain($domain0->name);
+            is($domain->has_display($type),$value);
+
+            my $domain_f = $vm->search_domain($domain0->name);
+            is($domain_f->has_display($type),$value);
+
+            $domain->shutdown_now($USER)    if $domain->is_active;
+            $domain->start($USER);
+
+            my $display = $domain->display($USER,$type);
+            if (!$value) {
+                is($display,undef);
+                next;
+            }
+            like($display,qr(^$type://\d+\.)) and do {
+                my ($port) = $display =~ m{.*:(\d+)};
+                ok(!$used_port{$port}, "Port $port already used for "
+                    .($used_port{$port} or ''));
+                $used_port{$port} = $type;
+            };
+            $domain->shutdown_now($USER)    if $domain->is_active;
         }
     }
 
@@ -148,6 +187,8 @@ SKIP: {
     }
 
     skip($msg,10)   if !$vm;
+
+    test_display_ports($vm_name);
 
     test_domain_display($vm_name);
     test_domain_display_req($vm_name);
