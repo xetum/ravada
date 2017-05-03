@@ -23,6 +23,7 @@
     %= include 'main/vm_copy'
 % }
     %= include 'main/vm_options'
+    %= include 'main/vm_display'
         </div><!-- del panel default-->
     </div><!-- del page-header -->
 </div><!-- del ng-controller -->

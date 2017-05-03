@@ -1133,7 +1133,7 @@ sub settings_machine {
     $c->stash(domain => $domain);
     $c->stash(USER => $USER);
 
-    $req = Ravada::Request->start_domain(
+    my $req = Ravada::Request->start_domain(
                         uid => $USER->id
                      , name => $domain->name
                 , remote_ip => _remote_ip($c)

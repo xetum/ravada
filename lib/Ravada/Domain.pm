@@ -679,6 +679,17 @@ sub has_clones {
     return scalar $self->clones;
 }
 
+sub has_rdp {
+    return $_[0]->_data('has_rdp');
+}
+
+sub has_spice {
+    return $_[0]->_data('has_spice');
+}
+
+sub has_x2go{
+    return $_[0]->_data('has_x2go');
+}
 
 =head2 list_files_base
 Returns a list of the filenames of this base-type domain
@@ -895,7 +906,6 @@ sub _post_shutdown_now {
 }
 
 =head2 can_hybernate
->>>>>>> master
 
 Returns wether a domain supports hybernation
 

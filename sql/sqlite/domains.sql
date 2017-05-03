@@ -14,6 +14,7 @@ CREATE TABLE `domains` (
 ,  `vm` char(120) NOT NULL
 ,  `has_spice` integer default 1
 ,  `has_x2go` integer default 0
+,  `has_rdp` integer default 0
 ,  `spice_password` char(20) DEFAULT NULL
 ,  UNIQUE (`id_base`,`name`)
 ,  UNIQUE (`name`)

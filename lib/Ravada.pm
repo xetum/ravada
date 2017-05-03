@@ -254,8 +254,16 @@ sub _upgrade_tables {
     $self->_upgrade_table('networks','requires_password','int(11)');
 
     $self->_upgrade_table('domains','spice_password','varchar(20) DEFAULT NULL');
-    $self->_upgrade_table('domains','has_spice','int(11) DEFAULT NULL');
+    if ($self->_upgrade_table('domains','has_spice'
+                                ,'int(11) DEFAULT 1')){
+        my $sth = $CONNECTOR->dbh->prepare(
+            "UPDATE domains set has_spice=1 "
+        );
+        $sth->execute;
+
+    }
     $self->_upgrade_table('domains','has_x2go','int(11) DEFAULT NULL');
+    $self->_upgrade_table('domains','has_rdp','int(11) DEFAULT NULL');
 }
 
 
