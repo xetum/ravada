@@ -19,6 +19,9 @@ use Moose;
 use Sys::Virt::Stream;
 use XML::LibXML;
 
+use feature qw(signatures);
+no warnings "experimental::signatures";
+
 with 'Ravada::Domain';
 
 has 'domain' => (
@@ -442,8 +445,34 @@ Returns the display URI
 
 =cut
 
-sub display {
-    my $self = shift;
+sub display($self,$user,$type='spice') {
+    return $self->_display_spice()  if lc($type) eq 'spice';
+    return $self->_display_rdp()    if lc($type) eq 'rdp';
+    return $self->_display_x2go()   if lc($type) eq 'x2go';
+
+    confess "Unknown display type '$type'";
+}
+
+sub _display_x2go($self) {
+    return if !$self->has_x2go;
+
+    my ($ip,$port) = $self->public_address(22);
+    die "X2go port isn't forwarded" if !$ip || !$port;
+
+    return "x2go://$ip:$port";
+}
+
+sub _display_rdp($self) {
+    return if !$self->has_rdp;
+
+    my ($ip,$port) = $self->public_address(3389);
+    die "RDP port isn't forwarded" if !$ip || !$port;
+
+    return "rdp://$ip:$port";
+}
+
+sub _display_spice($self) {
+    return if !$self->has_spice;
 
     my $xml = XML::LibXML->load_xml(string => $self->domain->get_xml_description);
     my ($graph) = $xml->findnodes('/domain/devices/graphics')
@@ -1174,6 +1203,13 @@ sub _hwaddr {
     }
     return @hwaddr;
 }
+
+=head2 ip
+
+Returns the internal IP address of the domain
+
+=cut
+
 
 sub ip {
     my $self = shift;
