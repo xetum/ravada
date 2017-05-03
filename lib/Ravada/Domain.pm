@@ -708,24 +708,63 @@ sub has_clones {
     return scalar $self->clones;
 }
 
+=head2 has_rdp
+
+Returns if the domain has a display enabled for Windows Remote Desktop Protocol ( rdp )
+
+=cut
+
+
 sub has_rdp {
     my $self = shift;
     return $self->_data('has_rdp',@_);
 }
+
+=head2 has_spice
+
+Returns if the domain has a display enabled for SPICE
+
+=cut
+
 
 sub has_spice {
     my $self = shift;
     return $self->_data('has_spice',@_);
 }
 
-sub has_x2go{
+=head2 has_x2go
+
+Returns if the domain has a display enabled for X2go
+
+=cut
+
+
+sub has_x2go {
     my $self = shift;
     return $self->_data('has_x2go', @_);
 }
 
+=head2 has_display
+
+Returns if the domain has a display enabled of a specific type
+
+    if ($domain->has_display('rdp')) {
+        ...
+
+=cut
+
 sub has_display($self, $type) {
     return $self->_data("has_$type");
 }
+
+=head2 set_display
+
+Enables or disables a specific type of domain for the domain
+
+    $domain->set_display(rdp => 1);
+    $domain->set_display(x2go => 0);
+
+=cut
 
 sub set_display($self, $type, $value) {
     return $self->_data("has_$type", $value);
@@ -1079,7 +1118,6 @@ sub open_nat_ports {
         }
 
         my $public_port = $self->_new_free_port();
-        warn "NAT $local_ip:$public_port -> $domain_ip:$domain_port";
         $self->_add_iptable(@_, local_ip => $local_ip, local_port => $public_port);
         $self->_add_iptable_nat(@_
             ,%args_nat
@@ -1165,12 +1203,10 @@ sub _new_free_port {
     #TODO
     #$self->_list_used_ports_nat2016-July/thread.html(\$used_port);
 
-    warn Dumper($used_port);
     my $free_port = 8400;
     for (;;) {
         last if !$used_port->{$free_port};
         $free_port++ ;
-        warn $free_port;
     }
     return $free_port;
 
