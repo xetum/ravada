@@ -26,6 +26,9 @@ use Ravada::Front;
 use Ravada::Auth;
 use POSIX qw(locale_h);
 
+use feature qw(signatures);
+no warnings "experimental::signatures";
+
 my $help;
 my $FILE_CONFIG = "/etc/ravada.conf";
 our $VERSION_TYPE = "";
@@ -1143,22 +1146,36 @@ sub settings_machine {
 
     $c->stash(message => '');
     my @reqs = ();
+    _set_drivers($c, $domain->id, \@reqs)   if $c->param('drivers');
+    _set_display($c, $domain)   if $c->param('display');
+    for my $req (@reqs) {
+        $RAVADA->wait_request($req, 60)
+    }
+    $domain = $RAVADA->search_domain($domain->name) if @reqs || $c->param('display');
+
+    return $c->render(template => 'main/settings_machine'
+        , action => $c->req->url->to_abs->path);
+}
+
+sub _set_drivers($c, $id_domain, $reqs) {
     for (qw(sound video network)) {
         my $driver = "driver_$_";
         if ( $c->param($driver) ) {
             my $req2 = Ravada::Request->set_driver(uid => $USER->id
-                , id_domain => $domain->id
+                , id_domain => $id_domain
                 , id_option => $c->param($driver)
             );
             $c->stash(message => 'Driver change will apply on next start');
-            push @reqs,($req2);
+            push @$reqs,($req2);
         }
     }
-    for my $req (@reqs) {
-        $RAVADA->wait_request($req, 60)
+}
+
+sub _set_display($c, $domain) {
+    for my $type (qw(spice x2go rdp)) {
+        my $value = ($c->param($type) or 0);
+        $domain->set_display($type, $value);
     }
-    return $c->render(template => 'main/settings_machine'
-        , action => $c->req->url->to_abs->path);
 }
 
 sub _enable_buttons {
