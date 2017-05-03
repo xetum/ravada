@@ -189,8 +189,9 @@ any '/admin' => sub {
 };
 
 any '/admin/networks' => sub {
-  my $c = shift;
-  $c->render(template => '/main/networks');
+    my $c = shift;
+    push @{$c->stash->{js}}, '/js/admin.js';
+    $c->render(template => '/main/networks');
 };
 
 any '/admin/new_networks' => sub {
@@ -211,6 +212,7 @@ sub networks {
         all_domains => $c->param('all_domains'),
         no_domains => $c->param('no_domains') )
     }
+    push @{$c->stash->{js}}, '/js/admin.js';
     $c->render(template => 'main/new_networks');
 }
 

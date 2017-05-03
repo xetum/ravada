@@ -200,9 +200,6 @@ function networksPageC($scope, $http, $interval, request) {
         $scope.list_networks= response.data;
       });
     }
-    $scope.action = function(target,action,machineId){
-      $http.get('/'+target+'/'+action+'/'+machineId+'.json');
-    };
     //On load code
     $scope.getNetworks();
     $scope.updatePromise = $interval($scope.getNetworks,3000);

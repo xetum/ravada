@@ -33,14 +33,13 @@
       </tr>
     </thead>
     <tbody>
-      <tr ng-repeat="networks in list_networks">
-        <td>{{networks.name}}</td>
-        <td>{{networks.address}}</td>
-        <td>{{networks.description}}</td> 
-
-          </a>
-        </td>
-      </tr>
+        <tr ng-repeat="network in list_networks">
+            <td>{{ network.name }}</td>
+            <td>{{ network.address }}</td>
+            <td>{{ network.description }}</td>
+            <td>{{ network.all_domains }}</td>
+            <td>{{ network.no_domains }}</td>
+        </tr>
     </tbody>
   </table>
 </div>
