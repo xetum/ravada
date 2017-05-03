@@ -130,6 +130,13 @@ sub _around_create_domain {
     $self->_pre_create_domain(@_);
     my $domain = $self->$orig(@_);
     $domain->add_volume_swap( size => $args{swap})  if $args{swap};
+
+    if ($args{id_base}) {
+        my $base = $self->search_domain_by_id($args{id_base});
+        for my $type (qw(spice rdp x2go)) {
+            $domain->set_display($type => $base->has_display($type));
+        }
+    }
     return $domain;
 }
 

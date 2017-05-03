@@ -37,6 +37,7 @@ sub test_domain_display($vm_name){
 
     ok($domain->has_spice());
     ok(!$domain->has_x2go());
+    ok(!$domain->has_rdp());
 
     my $domain_f = rvd_front->search_domain($domain->name);
     ok($domain_f->has_spice());
@@ -51,8 +52,8 @@ sub test_domain_display($vm_name){
         is($domain_f->has_spice(),$val);
         is($domain->has_display('spice'),$val);
 
-        eval {is($domain_f->has_spice(3),$val)};
-        like($@,qr(read));
+        eval {is($domain_f->has_spice($val+1),$val+1)};
+        is($@,'');
 
         is($domain->has_x2go($val) ,$val);
         is($domain->has_x2go() ,$val);
@@ -60,8 +61,8 @@ sub test_domain_display($vm_name){
         is($domain_f->has_x2go(), $val);
         is($domain_f->has_display('x2go'),$val);
 
-        eval {is($domain_f->has_x2go(3),$val)};
-        like($@,qr(read));
+        eval {is($domain_f->has_x2go($val+1),$val+1)};
+        is($@,'');
 
         is($domain->has_rdp($val) ,$val);
         is($domain->has_rdp() ,$val);
@@ -69,8 +70,8 @@ sub test_domain_display($vm_name){
         is($domain_f->has_rdp(), $val);
         is($domain->has_display('rdp'),$val);
 
-        eval {is($domain_f->has_rdp(3),$val)};
-        like($@,qr(read));
+        eval {is($domain_f->has_rdp($val+1),$val+1)};
+        is($@,'');
 
     }
 
@@ -101,6 +102,35 @@ sub test_domain_display_req($vm_name) {
     }
 }
 
+sub test_display_children($vm_name) {
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my $domain0 = $vm->create_domain( name => new_domain_name()
+        , id_iso => 1
+        , id_owner => $USER->id
+    );
+    for my $type ( qw(spice rdp x2go)) {
+        for my $value ( 0 , 1 , 2) {
+            $domain0->set_display($type => $value);
+
+            my $domain = $vm->search_domain($domain0->name);
+            is($domain->has_display($type),$value);
+
+            my $domain_f = $vm->search_domain($domain0->name);
+            is($domain_f->has_display($type),$value);
+
+            $domain0->prepare_base($USER)   if !$domain0->is_base();
+
+            my $child = $domain0->clone(name => new_domain_name(), user => $USER);
+            is($child->has_display($type),$value);
+            
+            my $child_f = $vm->search_domain($child->name);
+            is($child_f->has_display($type),$value);
+        }
+    }
+
+}
+
 #################################################################
 
 clean();
@@ -121,6 +151,8 @@ SKIP: {
 
     test_domain_display($vm_name);
     test_domain_display_req($vm_name);
+
+    test_display_children($vm_name);
 }
 
 clean();
