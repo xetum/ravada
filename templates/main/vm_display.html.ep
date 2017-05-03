@@ -6,11 +6,18 @@
 
             Select the display type
 
-            <form method="post">
-                <input type="checkbox" name="spice"/>Spice<br/>
-                <input type="checkbox" name="x2go">X2Go<br/>
-                <input type="checkbox" name="rdp">Windows RDP<br/>
+            <form method="post" action="<%= $action %>">
+                <input type="checkbox" name="spice" value="1"
+                    ng-checked="<%= $domain->has_spice %>"/>Spice<br/>
+
+                <input type="checkbox" name="x2go" value="1"
+                    ng-checked="<%= $domain->has_x2go %>"/>X2Go<br/>
+
+                <input type="checkbox" name="rdp" value="1"
+                    ng-checked="<%= $domain->has_rdp %>"/>Windows RDP<br/>
+                <input type="submit" name="display">
             </form>
+
         </div>
     </div>
 </div>
