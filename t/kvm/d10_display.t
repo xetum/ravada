@@ -48,20 +48,57 @@ sub test_domain_display($vm_name){
         is($domain->has_spice(),$val);
         $domain_f = rvd_front->search_domain($domain->name);
         is($domain_f->has_spice(),$val);
+        is($domain->has_display('spice'),$val);
+
+        eval {is($domain_f->has_spice(3),$val)};
+        like($@,qr(read));
 
         is($domain->has_x2go($val) ,$val);
         is($domain->has_x2go() ,$val);
         $domain_f = rvd_front->search_domain($domain->name);
         is($domain_f->has_x2go(), $val);
+        is($domain_f->has_display('x2go'),$val);
+
+        eval {is($domain_f->has_x2go(3),$val)};
+        like($@,qr(read));
 
         is($domain->has_rdp($val) ,$val);
         is($domain->has_rdp() ,$val);
         $domain_f = rvd_front->search_domain($domain->name);
         is($domain_f->has_rdp(), $val);
+        is($domain->has_display('rdp'),$val);
+
+        eval {is($domain_f->has_rdp(3),$val)};
+        like($@,qr(read));
 
     }
 
 }
+
+sub test_domain_display_req($vm_name) {
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my $domain0 = $vm->create_domain( name => new_domain_name()
+        , id_iso => 1
+        , id_owner => $USER->id
+    );
+    for my $type ( qw(spice rdp x2go)) {
+        for my $value ( 0 , 1 , 2) {
+            my $req = Ravada::Request->set_display(
+                   uid => $USER->id
+                ,$type => $value
+            ,id_domain => $domain0->id
+            );
+            rvd_back->_process_all_requests_dont_fork();
+            my $domain = $vm->search_domain($domain0->name);
+            is($domain->has_display($type),$value);
+
+            my $domain_f = $vm->search_domain($domain0->name);
+            is($domain_f->has_display($type),$value);
+        }
+    }
+}
+
 #################################################################
 
 clean();
@@ -81,6 +118,7 @@ SKIP: {
     skip($msg,10)   if !$vm;
 
     test_domain_display($vm_name);
+    test_domain_display_req($vm_name);
 }
 
 clean();
