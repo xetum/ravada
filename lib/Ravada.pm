@@ -15,6 +15,8 @@ use YAML;
 
 use Socket qw( inet_aton inet_ntoa );
 
+use feature qw(signatures);
+
 use Ravada::Auth;
 use Ravada::Request;
 use Ravada::VM::KVM;
@@ -1386,6 +1388,30 @@ sub _cmd_set_driver {
     $domain->set_driver_id($request->args('id_option'));
 }
 
+sub _cmd_set_display ($self,$request) {
+    my $uid = $request->args('uid')
+        or die "ERROR: Missing uid";
+
+    my $id_domain = $request->args('id_domain')
+        or die "ERROR: Missing id_domain";
+
+    die Dumper($request->args);
+    my $user = Ravada::Auth::SQL->search_by_id($uid);
+    my $domain = $self->search_domain_by_id($id_domain);
+    die "USER $uid not authorized to set driver for domain ".$domain->name
+        if $domain->id_owner != $user->id && !$user->is_admin;
+
+    my %args = %{$request->args};
+    delete $args{uid};
+    delete $args{id_domain};
+    for my $type (%args) {
+        warn "setting $type $args{$type}";
+        $domain->set_display($type => $args{$type});
+    }
+
+
+}
+
 sub _req_method {
     my $self = shift;
     my  $cmd = shift;
@@ -1403,6 +1429,7 @@ sub _req_method {
      ,hybernate => \&_cmd_hybernate
     ,set_driver => \&_cmd_set_driver
     ,domdisplay => \&_cmd_domdisplay
+   ,set_display => \&_cmd_set_display
     ,screenshot => \&_cmd_screenshot
    ,remove_base => \&_cmd_remove_base
   ,ping_backend => \&_cmd_ping_backend

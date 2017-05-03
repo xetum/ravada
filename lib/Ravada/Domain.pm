@@ -18,6 +18,7 @@ use JSON::XS;
 use Moose::Role;
 use Sys::Statistics::Linux;
 use IPTables::ChainMgr;
+use feature qw(signatures);
 
 use Ravada::Domain::Driver;
 use Ravada::Utils;
@@ -711,6 +712,10 @@ sub has_spice {
 sub has_x2go{
     my $self = shift;
     return $self->_data('has_x2go', @_);
+}
+
+sub has_display($self, $type, $value = undef) {
+    return $self->_data("has_$type", $value);
 }
 
 =head2 list_files_base

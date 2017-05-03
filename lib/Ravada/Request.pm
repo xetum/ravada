@@ -60,6 +60,8 @@ our %VALID_ARG = (
     ,set_driver => {uid => 1, id_domain => 1, id_option => 1}
     ,hybernate=> {uid => 1, id_domain => 1}
     ,download => {uid => 2, id_iso => 1, id_vm => 2, delay => 2}
+    ,set_display => { uid => 2, id_domain=>1 
+                        , spice => 2, x2go => 2, rdp => 2}
 );
 
 our %CMD_SEND_MESSAGE = map { $_ => 1 }
