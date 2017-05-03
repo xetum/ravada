@@ -16,6 +16,7 @@ use YAML;
 use Socket qw( inet_aton inet_ntoa );
 
 use feature qw(signatures);
+no warnings "experimental::signatures";
 
 use Ravada::Auth;
 use Ravada::Request;
@@ -1395,18 +1396,16 @@ sub _cmd_set_display ($self,$request) {
     my $id_domain = $request->args('id_domain')
         or die "ERROR: Missing id_domain";
 
-    die Dumper($request->args);
     my $user = Ravada::Auth::SQL->search_by_id($uid);
     my $domain = $self->search_domain_by_id($id_domain);
     die "USER $uid not authorized to set driver for domain ".$domain->name
         if $domain->id_owner != $user->id && !$user->is_admin;
 
-    my %args = %{$request->args};
-    delete $args{uid};
-    delete $args{id_domain};
-    for my $type (%args) {
-        warn "setting $type $args{$type}";
-        $domain->set_display($type => $args{$type});
+    my $args = $request->args();
+    delete $args->{uid};
+    delete $args->{id_domain};
+    for my $type (keys %$args) {
+        $domain->set_display($type => $args->{$type});
     }
 
 
