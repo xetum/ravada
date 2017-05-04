@@ -142,6 +142,9 @@ sub test_display_ports($vm_name) {
     my %used_port;
     for my $type ( qw(spice rdp x2go)) {
         for my $value ( 0 , 1 , 2) {
+            next if $type =~ /spice/i && !$value;
+
+            diag("$vm_name $type : $value");
             $domain0->set_display($type => $value);
 
             my $domain = $vm->search_domain($domain0->name);
@@ -151,7 +154,13 @@ sub test_display_ports($vm_name) {
             is($domain_f->has_display($type),$value);
 
             $domain->shutdown_now($USER)    if $domain->is_active;
-            $domain->start($USER);
+            $domain->start(user => $USER, remote_ip => '10.0.0.1');
+
+            for ( 1 .. 10 ) {
+                last if $domain->ip;
+                sleep 1;
+            }
+            ok($domain->ip,"Expecting an IP") or next;
 
             my $display = $domain->display($USER,$type);
             if (!$value) {
@@ -160,8 +169,9 @@ sub test_display_ports($vm_name) {
             }
             like($display,qr(^$type://\d+\.)) and do {
                 my ($port) = $display =~ m{.*:(\d+)};
-                ok(!$used_port{$port}, "Port $port already used for "
-                    .($used_port{$port} or ''));
+                ok(!$used_port{$port} || $used_port{$port} eq $type
+                    , "[$vm_name:$type] Port $port already used for "
+                        .($used_port{$port} or ''));
                 $used_port{$port} = $type;
             };
             $domain->shutdown_now($USER)    if $domain->is_active;
