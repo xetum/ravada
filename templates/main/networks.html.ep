@@ -38,10 +38,14 @@
             <td>{{ network.name }}</td>
             <td>{{ network.address }}</td>
             <td>{{ network.description }}</td>
-            <td>{{ network.all_domains }}</td>
-            <td>{{ network.no_domains }}</td>
-            <td><p ng-show="{{network.requires_password}}" class="fa fa-lock" aria-hidden="true" title="User needed a password to connect">
-            <p ng-show="{{network.requires_password!=1}}" class="fa fa-unlock" aria-hidden="true" title="Password not required"></td>
+            <td><p ng-show="{{network.all_domains}}" class="fa fa-check" aria-hidden="true"></p>
+                <p ng-show="{{network.all_domains!=1}}" class="fa fa-times" aria-hidden="true"></p>
+            </td>
+            <td><p ng-show="{{network.no_domains}}" class="fa fa-check" aria-hidden="true"></p>
+                <p ng-show="{{network.no_domains!=1}}" class="fa fa-times" aria-hidden="true"></p>
+            </td>
+            <td><p ng-show="{{network.requires_password}}" class="fa fa-lock" aria-hidden="true" title="User needed a password to connect"></p>
+            <p ng-show="{{network.requires_password!=1}}" class="fa fa-unlock" aria-hidden="true" title="Password not required"></p></td>
         </tr>
     </tbody>
   </table>
