@@ -31,6 +31,7 @@ our $MIN_FREE_MEMORY = 1024*1024;
 our $IPTABLES_CHAIN = 'RAVADA';
 
 our %ALLOW_SET_IN_RO = map { $_ => 1 } qw(has_spice has_x2go has_rdp);
+our %DISPLAY_PORT = ( x2go => 22, rdp => 3389 );
 
 _init_connector();
 
@@ -767,8 +768,50 @@ Enables or disables a specific type of domain for the domain
 =cut
 
 sub set_display($self, $type, $value) {
+    my $old_value = $self->_data("has_$type");
+
+    eval {
+        $self->add_nat($DISPLAY_PORT{$type}) if $value 
+                                            && (defined $old_value && ! $old_value)
+                                            && $DISPLAY_PORT{$type};
+    };
+    die $@ if $@ && $@ !~ /unique/i;
+
     return $self->_data("has_$type", $value);
 }
+
+=head2 display
+
+Returns the display URI
+
+=cut
+
+sub display($self,$user,$type='spice') {
+    return $self->_display_spice()  if lc($type) eq 'spice';
+    return $self->_display_rdp()    if lc($type) eq 'rdp';
+    return $self->_display_x2go()   if lc($type) eq 'x2go';
+
+    confess "Unknown display type '$type'";
+}
+
+sub _display_x2go($self) {
+    return if !$self->has_x2go;
+
+    my ($ip,$port) = $self->public_address(22);
+    die "X2go port isn't forwarded" if !$ip || !$port;
+
+    return "x2go://$ip:$port";
+}
+
+sub _display_rdp($self) {
+    return if !$self->has_rdp;
+
+    my ($ip,$port) = $self->public_address(3389);
+    confess "RDP port isn't forwarded" if !$ip || !$port;
+
+    return "rdp://$ip:$port";
+}
+
 
 =head2 list_files_base
 Returns a list of the filenames of this base-type domain
@@ -1084,6 +1127,7 @@ sub open_nat_ports {
     my $remote_ip = $args{remote_ip}
         or return;
 
+    warn "Open nat $remote_ip\n";
     my $query = "SELECT name,port FROM base_ports WHERE (id_domain=?";
     $query .=" OR id_base=?" if $self->id_base;
     $query .= ")";
@@ -1117,6 +1161,7 @@ sub open_nat_ports {
             next;
         }
 
+        warn "\t $domain_port\n";
         my $public_port = $self->_new_free_port();
         $self->_add_iptable(@_, local_ip => $local_ip, local_port => $public_port);
         $self->_add_iptable_nat(@_
