@@ -205,14 +205,15 @@ sub networks {
     my $c = shift;
     if ($c->param('name') && $c->param('address') ) {
 
-    Ravada::Network->new(
-        name => $c->param('name'),
-        address => $c->param('address'),
-        description => $c->param('description'),
-        all_domains => $c->param('all_domains'),
-        no_domains => $c->param('no_domains'),
-        n_order => $c->param('n_order'),
-        requires_password => $c->param('requires_password') )
+        Ravada::Network->new(
+            name => $c->param('name'),
+            address => $c->param('address'),
+            description => $c->param('description'),
+            all_domains => $c->param('all_domains'),
+            no_domains => $c->param('no_domains'),
+            n_order => $c->param('n_order'),
+            requires_password => $c->param('requires_password') );
+        return $c->render(template => 'main/networks');
     }
     push @{$c->stash->{js}}, '/js/admin.js';
     $c->render(template => 'main/new_networks');
