@@ -37,7 +37,6 @@ _init_connector();
 
 requires 'name';
 requires 'remove';
-requires 'display';
 
 requires 'is_active';
 requires 'is_hibernated';
@@ -374,22 +373,22 @@ sub _data {
     confess "ERROR: I can'set $field to '$new_value' in readonly\n"
         if defined $new_value && $self->readonly && !$ALLOW_SET_IN_RO{$field};
 
-    my $value;
+    my $old_value;
     if ( exists $self->{_data}->{$field} ) {
-        $value = $self->{_data}->{$field};
+        $old_value = $self->{_data}->{$field};
     } else {
         $self->{_data} = $self->_select_domain_db( name => $self->name);
-        $value = $self->{_data}->{$field}   if $self->{_data};
+        $old_value = $self->{_data}->{$field}   if $self->{_data};
     }
     confess "No DB info for domain ".$self->name    if !$self->{_data};
     confess "No field $field in domains"            if !exists$self->{_data}->{$field};
 
-    if ( defined $new_value && (!defined $value || $value ne $new_value)) {
+    if ( defined $new_value && (!defined $old_value || $old_value ne $new_value)) {
         $self->_update_data($field,$new_value);
         return $new_value;
     }
 
-    return $value;
+    return $old_value;
 }
 
 sub _update_data {
@@ -774,8 +773,12 @@ sub set_display($self, $type, $value) {
         $self->add_nat($DISPLAY_PORT{$type}) if $value 
                                             && (defined $old_value && ! $old_value)
                                             && $DISPLAY_PORT{$type};
+
     };
     die $@ if $@ && $@ !~ /unique/i;
+
+    $self->remove_nat($DISPLAY_PORT{$type})
+        if !$value && $old_value && $DISPLAY_PORT{$type};
 
     return $self->_data("has_$type", $value);
 }
@@ -797,7 +800,7 @@ sub display($self,$user,$type='spice') {
 sub _display_x2go($self) {
     return if !$self->has_x2go;
 
-    my ($ip,$port) = $self->public_address(22);
+    my ($ip,$port) = $self->public_address($DISPLAY_PORT{x2go});
     die "X2go port isn't forwarded" if !$ip || !$port;
 
     return "x2go://$ip:$port";
@@ -806,7 +809,7 @@ sub _display_x2go($self) {
 sub _display_rdp($self) {
     return if !$self->has_rdp;
 
-    my ($ip,$port) = $self->public_address(3389);
+    my ($ip,$port) = $self->public_address($DISPLAY_PORT{rdp});
     confess "RDP port isn't forwarded" if !$ip || !$port;
 
     return "rdp://$ip:$port";
@@ -998,7 +1001,7 @@ sub _post_shutdown {
 
     $self->_remove_temporary_machine(@_);
     $self->_remove_iptables(@_);
-    $self->_close_nat_ports(@_);
+#    $self->_close_nat_ports(@_);
     $self->clean_swap_volumes(@_) if $self->id_base() && !$self->is_active;
 
     if (defined $timeout) {
@@ -1127,7 +1130,6 @@ sub open_nat_ports {
     my $remote_ip = $args{remote_ip}
         or return;
 
-    warn "Open nat $remote_ip\n";
     my $query = "SELECT name,port FROM base_ports WHERE (id_domain=?";
     $query .=" OR id_base=?" if $self->id_base;
     $query .= ")";
@@ -1156,19 +1158,20 @@ sub open_nat_ports {
             local_ip => $local_ip
             ,domain_ip => $domain_ip, domain_port => $domain_port
         );
-        if ($self->_is_nat_port_open(%args_nat)) {
-            warn "Domain.pm : NAT ports already open $domain_ip:$domain_port\n";
-            next;
+        my $rule = $self->_is_nat_port_open(%args_nat);
+        my $public_port;
+        $public_port = $rule->{d_port}   if $rule;
+        if ($public_port) {
+            die "Domain.pm : NAT ports already open $domain_ip:$domain_port -> $public_port\n"
+                .Dumper($rule);
+        } else {
+            $public_port = $self->_new_free_port();
+            $self->_add_iptable(@_, local_ip => $local_ip, local_port => $public_port);
+            $self->_add_iptable_nat(@_
+                ,%args_nat
+                ,local_port => $public_port
+            );
         }
-
-        warn "\t $domain_port\n";
-        my $public_port = $self->_new_free_port();
-        $self->_add_iptable(@_, local_ip => $local_ip, local_port => $public_port);
-        $self->_add_iptable_nat(@_
-            ,%args_nat
-            ,local_port => $public_port
-        );
-
         $sth_insert->execute($self->id
              , $local_ip, $public_port
             , $domain_ip, $domain_port
@@ -1182,13 +1185,16 @@ sub open_nat_ports {
 sub _is_nat_port_open {
     my $self = shift;
     my %arg = @_;
+    confess "Missing arg 'local_ip'"    if !exists$arg{local_ip};
+    confess "Missing arg 'domain_port'" if !exists$arg{domain_port};
+    confess "Missing arg 'domain_ip'"   if !exists$arg{domain_ip};
 
     my $ipt = IPTables::Parse->new();
 
     my @rule_num;
     for my $rule (@{$ipt->chain_rules('nat','PREROUTING')}) {
         lock_hash(%$rule);
-        return $rule->{rule_num}
+        return $rule
             if $rule->{dst} eq $arg{local_ip}
                 && $rule->{to_port} eq $arg{domain_port}
                 && $rule->{to_ip} eq $arg{domain_ip}
@@ -1290,15 +1296,33 @@ sub _list_used_ports_netstat {
 
 }
 
+=pod
+
 sub _close_nat_ports {
     my $self = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
-        "DELETE FROM domain_ports WHERE id_domain=?"
+        "SELECT * FROM domain_ports WHERE id_domain=?"
+    );
+    my $sth_delete = $$CONNECTOR->dbh->prepare(
+        "DELETE FROM domain_ports WHERE id=?"
     );
     $sth->execute($self->id);
+    while (my $row = $sth->fetchrow_hashref) {
+        warn "closing port ".$row->{internal_port}."\n";
+        $sth_delete->execute($row->{id});
+        my %args_nat = (
+                 domain_ip => $row->{internal_ip}
+             , domain_port => $row->{domain_port}
+             ,local_ip => $row->{public_ip}
+        );
+        my $rule = $self->_is_nat_port_open(%args_nat);
+        die "$. found rule ".Dumper($rule) if $rule;
+    }
     $sth->finish;
 }
+
+=cut
 
 sub _add_iptable_display {
     my $self = shift;
@@ -1579,6 +1603,35 @@ sub add_nat{
     $sth->finish;
 }
 
+=head2 remove_nat
+
+Remove domain private port NAT. All existing clones will do nat to this port if defined before.
+To know what is the public ip and port the method public_address($port) must be called.
+
+Arguments: port
+
+    $domain->remove_nat(22);
+
+
+=cut
+
+sub remove_nat($self, $port){
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "DELETE FROM base_ports WHERE id_domain=? AND port=?"
+    );
+    $sth->execute($self->id, $port);
+    $sth->finish;
+
+    $sth = $$CONNECTOR->dbh->prepare(
+        "DELETE FROM domain_ports WHERE id_domain=? AND internal_port=?"
+    );
+    $sth->execute($self->id, $port);
+    $sth->finish;
+
+}
+
+
 
 =head2 public_address
 
@@ -1693,6 +1746,12 @@ sub _dbh {
     my $self = shift;
     _init_connector() if !$CONNECTOR || !$$CONNECTOR;
     return $$CONNECTOR->dbh;
+}
+
+sub _display_port($self, $type) {
+    my $port = $DISPLAY_PORT{$type};
+    confess "Unknown display port for '$type'"  if !$port;
+    return $port;
 }
 
 1;
