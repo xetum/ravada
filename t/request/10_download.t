@@ -20,18 +20,6 @@ $Ravada::SECONDS_WAIT_CHILDREN = 1;
 
 ##################################################################
 
-sub search_id_iso {
-    my $name = shift;
-    my $sth = $test->dbh->prepare("SELECT id FROM iso_images "
-        ." WHERE name like ?"
-    );
-    $sth->execute("$name%");
-    my ($id) = $sth->fetchrow;
-    die "There is no iso called $name%" if !$id;
-    return $id;
-}
-##################################################################
-
 for my $vm_name ('KVM') {
     my $rvd_back = rvd_back();
     my $vm = $rvd_back->search_vm($vm_name);

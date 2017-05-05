@@ -111,28 +111,6 @@ sub test_fw_domain_stored {
 }
 
 
-sub open_ipt {
-    my %opts = (
-    	'use_ipv6' => 0,         # can set to 1 to force ip6tables usage
-	    'ipt_rules_file' => '',  # optional file path from
-	                             # which to read iptables rules
-	    'iptout'   => '/tmp/iptables.out',
-	    'ipterr'   => '/tmp/iptables.err',
-	    'debug'    => 0,
-	    'verbose'  => 0,
-
-	    ### advanced options
-	    'ipt_alarm' => 5,  ### max seconds to wait for iptables execution.
-	    'ipt_exec_style' => 'waitpid',  ### can be 'waitpid',
-	                                    ### 'system', or 'popen'.
-	    'ipt_exec_sleep' => 1, ### add in time delay between execution of
-	                           ### iptables commands (default is 0).
-	);
-
-	my $ipt_obj = IPTables::ChainMgr->new(%opts)
-    	or die "[*] Could not acquire IPTables::ChainMgr object";
-
-}
 
 sub test_chain {
     my $vm_name = shift;
@@ -150,13 +128,6 @@ sub test_chain {
                         .", got $rule_num ")
         if !$enabled;
 
-}
-
-
-sub flush_rules {
-    my $ipt = open_ipt();
-    $ipt->flush_chain('filter', $CHAIN);
-    $ipt->delete_chain('filter', 'INPUT', $CHAIN);
 }
 
 sub test_fw_ssh {
