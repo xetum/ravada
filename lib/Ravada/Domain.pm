@@ -1651,6 +1651,8 @@ sub public_address {
     my $self = shift;
     my $port = shift;
 
+    return if !$self->is_active;
+
     my $sth = $$CONNECTOR->dbh->prepare(
         "SELECT public_ip,public_port "
         ." FROM domain_ports "
