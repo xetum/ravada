@@ -1081,7 +1081,9 @@ sub _remove_iptables {
 sub _remove_temporary_machine {
     my $self = shift;
 
-    my %args = @_ if !scalar @_ % 2;
+    my %args;
+    %args = @_ if !scalar @_ % 2;
+
     my $user;
 
     return if !$self->is_known();
