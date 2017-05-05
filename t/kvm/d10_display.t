@@ -16,12 +16,14 @@ use Test::Ravada;
 my $test = Test::SQL::Data->new(config => 't/etc/sql.conf');
 
 use_ok('Ravada');
+init($test->connector);
+
+my $ID_ISO = search_id_iso('Ubuntu Mini');
 my %ARG_CREATE_DOM = (
-      KVM => [ id_iso => 1 ]
+      KVM => [ id_iso => $ID_ISO ]
 );
 
 my @VMS = reverse keys %ARG_CREATE_DOM;
-init($test->connector);
 my $USER = create_user("foo","bar");
 
 #################################################################
@@ -33,7 +35,7 @@ sub test_domain_display($vm_name){
     ok(!$net->requires_password);
     my $domain_name = new_domain_name();
     my $domain = $vm->create_domain( name => $domain_name
-                , id_iso => 1 , id_owner => $USER->id);
+                , id_iso => $ID_ISO , id_owner => $USER->id);
 
     ok($domain->has_spice());
     ok(!$domain->has_x2go());
@@ -81,7 +83,7 @@ sub test_domain_display_req($vm_name) {
     my $vm = rvd_back->search_vm($vm_name);
 
     my $domain0 = $vm->create_domain( name => new_domain_name()
-        , id_iso => 1
+        , id_iso => $ID_ISO
         , id_owner => $USER->id
     );
     for my $type ( qw(spice rdp x2go)) {
@@ -106,7 +108,7 @@ sub test_display_children($vm_name) {
     my $vm = rvd_back->search_vm($vm_name);
 
     my $domain0 = $vm->create_domain( name => new_domain_name()
-        , id_iso => 1
+        , id_iso => $ID_ISO
         , id_owner => $USER->id
     );
     for my $type ( qw(spice rdp x2go)) {
@@ -136,15 +138,14 @@ sub test_display_ports($vm_name) {
     my $vm = rvd_back->search_vm($vm_name);
 
     my $domain0 = $vm->create_domain( name => new_domain_name()
-        , id_iso => 1
+        , id_iso => $ID_ISO
         , id_owner => $USER->id
     );
     my %used_port;
     for my $type ( qw(spice rdp x2go)) {
-        for my $value ( 0 , 1 , 2) {
+        for my $value ( 0 , 1 , 2, 0) {
             next if $type =~ /spice/i && !$value;
 
-            diag("$vm_name $type : $value");
             $domain0->set_display($type => $value);
 
             my $domain = $vm->search_domain($domain0->name);
@@ -156,33 +157,69 @@ sub test_display_ports($vm_name) {
             $domain->shutdown_now($USER)    if $domain->is_active;
             $domain->start(user => $USER, remote_ip => '10.0.0.1');
 
-            for ( 1 .. 10 ) {
+            for ( 1 .. 60 ) {
                 last if $domain->ip;
                 sleep 1;
             }
-            ok($domain->ip,"Expecting an IP") or next;
+            my $domain_ip = $domain->ip;
+            ok($domain_ip,"Expecting an IP for domain ".$domain->name
+                            ." got: $domain_ip") or exit;
 
             my $display = $domain->display($USER,$type);
             if (!$value) {
-                is($display,undef);
+                is($display,undef,"Expecting no display , got '".($display or '')."'");
                 next;
             }
+
+            my ($ip,$port) = $display =~ m{.*://(\d+\..*\d+):(\d+)};
+
             like($display,qr(^$type://\d+\.)) and do {
-                my ($port) = $display =~ m{.*:(\d+)};
-                ok(!$used_port{$port} || $used_port{$port} eq $type
+                if ($type ne 'spice') {
+                    my ($ok,$msg) = test_chain_prerouting($vm_name, $ip
+                                    , $domain->_display_port($type), $domain_ip, 1);
+                    ok($ok, $msg) or exit;
+                }
+                ok(!$used_port{$port}
+                    || $used_port{$port} eq $type
+                    || ($used_port{$port} && !$domain->has_display($used_port{$port}))
                     , "[$vm_name:$type] Port $port already used for "
-                        .($used_port{$port} or ''));
+                        .($used_port{$port} or 'NOBODY'));
                 $used_port{$port} = $type;
             };
+            if ($type eq 'spice') {
+                is(_nat_ports($domain),0);
+            } else {
+                is(_nat_ports($domain),1);
+            }
+
             $domain->shutdown_now($USER)    if $domain->is_active;
+            if ($type ne 'spice') {
+                my ($ok,$msg) = test_chain_prerouting($vm_name, $ip
+                                    , $domain->_display_port($type), $domain_ip, 0);
+                ok($ok, $msg);
+            }
+            $domain0->set_display($type,0);
+            is(_nat_ports($domain),0,"Expecting 0 ports open for domain ".$domain->id) or exit;
+
         }
     }
 
 }
 
+sub _nat_ports($domain) {
+    my $sth = $test->dbh->prepare(
+        "SELECT count(*) FROM domain_ports "
+        ." WHERE id_domain=?"
+    );
+    $sth->execute($domain->id);
+    my ($n) = $sth->fetchrow;
+    return $n;
+}
+
 #################################################################
 
 clean();
+flush_rules();
 
 my $vm_name = 'KVM';
 my $vm = rvd_back->search_vm($vm_name);
@@ -200,6 +237,9 @@ SKIP: {
 
     test_display_ports($vm_name);
 
+    #TODO
+#test_display_ports_multiple($vm_name);
+
     test_domain_display($vm_name);
     test_domain_display_req($vm_name);
 
@@ -207,5 +247,6 @@ SKIP: {
 }
 
 clean();
+flush_rules();
 
 done_testing();
