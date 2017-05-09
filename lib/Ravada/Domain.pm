@@ -1141,7 +1141,7 @@ sub open_nat_ports {
     my @query_args = ($self->id);
     push @query_args,($self->id_base) if $self->id_base;
 
-    $sth->execute($self->id);
+    $sth->execute(@query_args);
     my $display = $self->display($args{user});
     my ($local_ip) = $display =~ m{\w+://(.*):\d+};
     my $domain_ip = $self->ip;

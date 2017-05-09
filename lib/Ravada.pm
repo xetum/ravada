@@ -144,8 +144,7 @@ sub _update_isos {
         $sth_search->execute($row->{$field});
         my ($id) = $sth_search->fetchrow;
         next if $id;
-        warn("INFO: updating $table : $row->{$field}\n")
-            if $0 !~/\.t$/;
+        warn("INFO: updating $table : $row->{$field}\n")    if $0 !~ /\.t$/;
 
         my $sql =
             "INSERT INTO iso_images "
@@ -177,7 +176,7 @@ sub _upgrade_table {
     $sth->finish;
     return if $row;
 
-    warn "INFO: adding $field $definition to $table\n";
+    warn "INFO: adding $field $definition to $table\n"  if $0 !~ /\.t$/;
     $dbh->do("alter table $table add $field $definition");
     return 1;
 }
