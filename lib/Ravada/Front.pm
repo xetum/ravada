@@ -16,6 +16,9 @@ use Moose;
 use Ravada;
 use Ravada::Network;
 
+use feature qw(signatures);
+no warnings "experimental::signatures";
+
 use Data::Dumper;
 
 has 'config' => (
@@ -284,6 +287,9 @@ Returns a reference to a list of the ISO images known by the system
 
 sub list_iso_images {
     my $self = shift;
+    my $vm_name = shift;
+
+    my $vm;
 
     my @iso;
     my $sth = $CONNECTOR->dbh->prepare(
@@ -292,6 +298,24 @@ sub list_iso_images {
     $sth->execute;
     while (my $row = $sth->fetchrow_hashref) {
         push @iso,($row);
+
+        next if $row->{device};
+
+        my $file;
+        ($file) = $row->{url} =~ m{.*/(.*)} if $row->{url};
+        my $file_re = $row->{file_re};
+        next if !$file_re && !$file || !$vm_name;
+
+        $vm = $self->search_vm($vm_name)    if !$vm;
+
+        if ($file) {
+            my $iso_file = $vm->search_volume_path($file);
+            $row->{device} = $iso_file  if $iso_file;
+        }
+        if ($file_re && !$row->{device}) {
+            my $iso_file = $vm->search_volume_path_re(qr($file_re));
+            $row->{device} = $iso_file  if $iso_file;
+        }
     }
     $sth->finish;
     return \@iso;
@@ -326,13 +350,13 @@ Returns a reference to a list of the users
 
 =cut
 
-sub list_users {
-    my $self = shift;
+sub list_users($self,$name=undef) {
     my $sth = $CONNECTOR->dbh->prepare("SELECT * FROM users ");
     $sth->execute();
     
     my @users = ();
     while ( my $row = $sth->fetchrow_hashref) {
+        next if defined $name && $row->{name} !~ /$name/;
         push @users, ($row);
     }
     $sth->finish;

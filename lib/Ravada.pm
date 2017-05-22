@@ -3,7 +3,7 @@ package Ravada;
 use warnings;
 use strict;
 
-our $VERSION = '0.2.5';
+our $VERSION = '0.2.6';
 
 use Carp qw(carp croak);
 use Data::Dumper;
@@ -59,6 +59,9 @@ $DIR_SQL = "/usr/share/doc/ravada/sql/mysql" if ! -e $DIR_SQL;
 our %HUGE_COMMAND = map { $_ => 1 } qw(download);
 our %LONG_COMMAND =  map { $_ => 1 } (qw(prepare_base remove_base screenshot ), keys %HUGE_COMMAND);
 
+our $USER_DAEMON;
+our $USER_DAEMON_NAME = 'daemon';
+
 has 'vm' => (
           is => 'ro'
         ,isa => 'ArrayRef'
@@ -103,9 +106,42 @@ sub BUILD {
         $self->connector($CONNECTOR);
     }
     Ravada::Auth::init($CONFIG);
+
     $self->_create_tables();
     $self->_upgrade_tables();
+    $self->_init_user_daemon();
     $self->_update_data();
+}
+
+sub _init_user_daemon {
+    my $self = shift;
+    return if $USER_DAEMON;
+
+    $USER_DAEMON = Ravada::Auth::SQL->new(name => $USER_DAEMON_NAME);
+    if (!$USER_DAEMON->id) {
+        $USER_DAEMON = Ravada::Auth::SQL::add_user(
+            name => $USER_DAEMON_NAME,
+            is_admin => 1
+        );
+        $USER_DAEMON = Ravada::Auth::SQL->new(name => $USER_DAEMON_NAME);
+    }
+
+}
+sub _update_user_grants {
+    my $self = shift;
+    $self->_init_user_daemon();
+    my $sth = $CONNECTOR->dbh->prepare("SELECT id FROM users");
+    my $id;
+    $sth->execute;
+    $sth->bind_columns(\$id);
+    while ($sth->fetch) {
+        my $user = Ravada::Auth::SQL->search_by_id($id);
+        next if $user->name() eq $USER_DAEMON_NAME;
+
+        $USER_DAEMON->grant_user_permissions($user);
+        $USER_DAEMON->grant_admin_permissions($user)    if $user->is_admin;
+    }
+    $sth->finish;
 }
 
 sub _update_isos {
@@ -135,6 +171,48 @@ sub _update_isos {
             ,md5 => 'c5cf5c5d568e2dfeaf705cfa82996d93'
 
         }
+        ,fedora => {
+            name => 'Fedora 25'
+            ,description => 'RedHat Fedora 25 Workstation 64 bits'
+            ,url => 'http://ftp.halifax.rwth-aachen.de/fedora/linux/releases/25/Workstation/x86_64/iso/Fedora-Workstation-netinst-x86_64-25-.*\.iso'
+            ,arch => 'amd64'
+            ,xml => 'xenial64-amd64.xml'
+            ,xml_volume => 'xenial64-volume.xml'
+            ,sha256_url => 'http://fedora.mirrors.ovh.net/linux/releases/25/Workstation/x86_64/iso/Fedora-Workstation-25-.*-x86_64-CHECKSUM'
+        }
+        ,xubuntu_zesty => {
+            name => 'Xubuntu Zesty Zapus'
+            ,description => 'Xubuntu 17.04 Zesty Zapus 64 bits'
+            ,arch => 'amd64'
+            ,xml => 'yakkety64-amd64.xml'
+            ,xml_volume => 'yakkety64-volume.xml'
+            ,md5 => '6bd80e10bf223a04d3aafe0f997d046b'
+            ,url => 'http://archive.ubuntu.com/ubuntu/dists/zesty/main/installer-amd64/current/images/netboot/mini.iso'
+        }
+        ,xubuntu_xenial => {
+            name => 'Xubuntu Xenial Xerus'
+            ,description => 'Xubuntu 16.04 Xenial Xerus 64 bits (LTS)'
+            ,url => 'http://archive.ubuntu.com/ubuntu/dists/xenial/main/installer-amd64/current/images/netboot/mini.iso'
+           ,xml => 'yakkety64-amd64.xml'
+            ,xml_volume => 'yakkety64-volume.xml'
+            ,md5 => 'fe495d34188a9568c8d166efc5898d22'
+        }
+        ,lubuntu_zesty => {
+            name => 'Lubuntu Zesty Zapus'
+            ,description => 'Lubuntu 17.04 Zesty Zapus 64 bits'
+            ,url => 'http://cdimage.ubuntu.com/lubuntu/releases/17.04/release/lubuntu-17.04-desktop-amd64.iso'
+            ,md5_url => 'http://cdimage.ubuntu.com/lubuntu/releases/17.04/release/MD5SUMS'
+            ,xml => 'yakkety64-amd64.xml'
+            ,xml_volume => 'yakkety64-volume.xml'
+        }
+        ,lubuntu_xenial => {
+            name => 'Lubuntu Xenial Xerus'
+            ,description => 'Xubuntu 16.04 Xenial Xerus 64 bits (LTS)'
+            ,url => 'http://cdimage.ubuntu.com/lubuntu/releases/16.04.2/release/lubuntu-16.04.2-desktop-amd64.iso'
+            ,md5_url => 'http://cdimage.ubuntu.com/lubuntu/releases/16.04.2/release/MD5SUMS'
+            ,xml => 'yakkety64-amd64.xml'
+            ,xml_volume => 'yakkety64-volume.xml'
+        }
 
     );
 
@@ -163,7 +241,9 @@ sub _update_isos {
 
 sub _update_data {
     my $self = shift;
+
     $self->_update_isos();
+    $self->_update_user_grants();
 }
 
 sub _upgrade_table {
@@ -235,13 +315,18 @@ sub _create_tables {
 
 sub _upgrade_tables {
     my $self = shift;
-    return if $CONNECTOR->dbh->{Driver}{Name} !~ /mysql/i;
+#    return if $CONNECTOR->dbh->{Driver}{Name} !~ /mysql/i;
 
     $self->_upgrade_table('file_base_images','target','varchar(64) DEFAULT NULL');
+
     $self->_upgrade_table('vms','vm_type',"char(20) NOT NULL DEFAULT 'KVM'");
+    $self->_upgrade_table('vms','connection_args',"text DEFAULT NULL");
+
     $self->_upgrade_table('requests','at_time','int(11) DEFAULT NULL');
 
     $self->_upgrade_table('iso_images','md5_url','varchar(255)');
+    $self->_upgrade_table('iso_images','sha256','varchar(255)');
+    $self->_upgrade_table('iso_images','sha256_url','varchar(255)');
     $self->_upgrade_table('iso_images','file_re','char(64)');
     $self->_upgrade_table('iso_images','device','varchar(255)');
 
@@ -254,6 +339,7 @@ sub _upgrade_tables {
     }
 
     $self->_upgrade_table('networks','requires_password','int(11)');
+    $self->_upgrade_table('networks','n_order','int(11) not null default 0');
 
     $self->_upgrade_table('domains','spice_password','varchar(20) DEFAULT NULL');
     if ($self->_upgrade_table('domains','has_spice'
