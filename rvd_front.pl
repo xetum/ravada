@@ -5,6 +5,7 @@ use strict;
 use locale ':not_characters';
 #####
 use Carp qw(confess);
+use Data::Dumper;
 use Digest::SHA qw(sha256_hex);
 use Data::Dumper;
 use Getopt::Long;
@@ -31,7 +32,6 @@ no warnings "experimental::signatures";
 
 my $help;
 my $FILE_CONFIG = "/etc/ravada.conf";
-our $VERSION_TYPE = "";
 
 my $CONFIG_FRONT = plugin Config => { default => {
                                                 hypnotoad => {
@@ -98,7 +98,9 @@ init();
 hook before_routes => sub {
   my $c = shift;
 
-  $c->stash(version => $RAVADA->version."$VERSION_TYPE");
+  my $version = $RAVADA->version();
+  $version =~ s/-/_/g;
+  $c->stash(version => $version);
   my $url = $c->req->url->to_abs->path;
   $c->stash(css=>['/css/sb-admin.css']
             ,js=>[
@@ -118,15 +120,21 @@ hook before_routes => sub {
 
   return login($c)
     if
-        $url !~ m{^/(anonymous|login|logout|requirements)}
+        $url !~ m{^/(anonymous|login|logout|requirements|robots.txt)}
         && $url !~ m{^/(css|font|img|js)}
         && !_logged_in($c);
 
-
+    _logged_in($c)  if $url =~ m{^/requirements};
 };
 
 
 ############################################################################3
+
+any '/robots.txt' => sub {
+    my $c = shift;
+    warn "robots";
+    return $c->render(text => "User-agent: *\nDisallow: /\n", format => 'text');
+};
 
 any '/' => sub {
     my $c = shift;
@@ -241,7 +249,10 @@ get '/list_bases.json' => sub {
 
 get '/list_images.json' => sub {
     my $c = shift;
-    $c->render(json => $RAVADA->list_iso_images);
+
+    my $vm_name = $c->param('backend');
+
+    $c->render(json => $RAVADA->list_iso_images($vm_name or undef));
 };
 
 get '/list_machines.json' => sub {
@@ -278,7 +289,6 @@ get '/pingbackend.json' => sub {
 get '/machine/info/(:id).(:type)' => sub {
     my $c = shift;
     my $id = $c->stash('id');
-    warn $id;
     die "No id " if !$id;
     $c->render(json => $RAVADA->domain_info(id => $id));
 };
@@ -408,22 +418,52 @@ get '/machine/public/#id/#value' => sub {
 
 # Users ##########################################################3
 
-##make admin
+##add user
 
-get '/users/make_admin/(:id).(:type)' => sub {
+any '/users/register' => sub {
+
        my $c = shift;
-      return make_admin($c);
+       return register($c);
 };
 
-##remove admin
+any '/admin/user/(:id).(:type)' => sub {
+    my $c = shift;
+    return access_denied($c) if !$USER->can_manage_users();
 
-get '/users/remove_admin/(:id).(:type)' => sub {
-       my $c = shift;
-       return remove_admin($c);
+    my $user = Ravada::Auth::SQL->search_by_id($c->stash('id'));
+
+    return $c->render(text => "Unknown user id: ".$c->stash('id'))
+        if !$user;
+
+    if ($c->param('make_admin')) {
+        $USER->make_admin($c->stash('id'))  if $c->param('is_admin');
+        $USER->remove_admin($c->stash('id'))if !$c->param('is_admin');
+        $user = Ravada::Auth::SQL->search_by_id($c->stash('id'));
+    }
+    if ($c->param('grant')) {
+        return access_denied($c)    if !$USER->can_grant();
+        my %grant;
+        for my $param_name (@{$c->req->params->names}) {
+            if ( $param_name =~ /^perm_(.*)/ ) {
+                $grant{$1} = 1;
+            } elsif ($param_name =~ /^off_perm_(.*)/) {
+                $grant{$1} = 0 if !exists $grant{$1};
+            }
+        }
+        for my $perm (keys %grant) {
+            if ( $grant{$perm} ) {
+                $USER->grant($user, $perm);
+            } else {
+                $USER->revoke($user, $perm);
+            }
+        }
+    }
+    $c->stash(user => $user);
+    return $c->render(template => 'main/manage_user');
 };
 
 ##############################################
-#
+
 
 get '/request/(:id).(:type)' => sub {
     my $c = shift;
@@ -568,7 +608,6 @@ get '/img/screenshots/:file' => sub {
         my $domain = $RAVADA->search_domain_by_id($id_domain);
         return $c->reply->not_found if !$domain;
         unless ($domain->is_base && $domain->is_public) {
-            warn "not owner";
             return access_denied($c) if $USER->id != $domain->id_owner;
         }
     }
@@ -699,7 +738,6 @@ sub logout {
     $c->session(expires => 1);
     $c->session(login => undef);
 
-    warn "logout";
 }
 
 sub quick_start {
@@ -796,6 +834,14 @@ sub admin {
 
     push @{$c->stash->{css}}, '/css/admin.css';
     push @{$c->stash->{js}}, '/js/admin.js';
+
+    if ($page eq 'users') {
+        $c->stash(list_users => []);
+        $c->stash(name => $c->param('name' or ''));
+        if ( $c->param('name') ) {
+            $c->stash(list_users => $RAVADA->list_users($c->param('name') ))
+        }
+    }
     $c->render(template => 'main/admin_'.$page);
 
 };
@@ -823,20 +869,23 @@ sub new_machine {
 sub req_new_domain {
     my $c = shift;
     my $name = $c->param('name');
+    my $vm = ( $c->param('backend') or 'KVM');
     my $swap = ($c->param('swap') or 0);
     $swap *= 1024*1024*1024;
-    my $req = $RAVADA->create_domain(
+
+    my %args = (
            name => $name
-        ,id_iso => $c->param('id_iso')
-        ,id_template => $c->param('id_template')
-        ,vm=> $c->param('backend')
+        ,vm=> $vm
         ,id_owner => $USER->id
         ,memory => int($c->param('memory')*1024*1024)
         ,disk => int($c->param('disk')*1024*1024*1024)
         ,swap => $swap
     );
 
-    return $req;
+    $args{id_template} = $c->param('id_template')   if $vm =~ /^LX/;
+    $args{id_iso} = $c->param('id_iso')             if $vm eq 'KVM';
+
+    return $RAVADA->create_domain(%args);
 }
 
 sub _show_request {
@@ -1093,13 +1142,31 @@ sub make_admin {
     return $c->render(inline => "1");
 }
 
-sub remove_admin {
+sub register {
+    
     my $c = shift;
-    return login($c) if !_logged_in($c);
-    my $id = $c->stash('id');
+    
+    my @error = ();
+       
+    my $username = $c->param('username');
+    my $password = $c->param('password');
+   
+   if($username) {
+       my @list_users = Ravada::Auth::SQL::list_all_users();
+       warn join(", ", @list_users);
+      
+       if (grep {$_ eq $username} @list_users) {
+           push @error,("Username already exists, please choose another one"); 
+           $c->render(template => 'bootstrap/new_user',error => \@error);
+       }
+       else {
+           #username don't exists
+           Ravada::Auth::SQL::add_user(name => $username, password => $password);
+           return $c->render(template => 'bootstrap/new_user_ok' , username => $username);
+       }
+   }
+   $c->render(template => 'bootstrap/new_user',error => \@error);
 
-    Ravada::Auth::SQL::remove_admin($id);
-    return $c->render(inline => "1");
 }
 
 sub manage_machine {
