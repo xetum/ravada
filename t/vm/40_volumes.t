@@ -211,6 +211,8 @@ sub test_domain_2_volumes {
     ok(scalar @volumes == 3
         ,"[$vm_name] Expecting 3 volumes, got ".scalar(@volumes));
 
+    $domain2->shutdown_now($USER)           if $domain2->is_active;
+    $domain2_clone->shutdown_now($USER)     if $domain2_clone->is_active;
 }
 
 sub test_domain_n_volumes {
@@ -246,6 +248,8 @@ sub test_domain_n_volumes {
         my ($file, $target) = @$vol;
         like($file,qr/-$target-/);
     }
+    $domain->shutdown_now($USER)        if $domain->is_active;
+    $domain_clone->shutdown_now($USER)  if $domain->is_active;
 }
 
 
@@ -259,6 +263,8 @@ sub test_domain_1_volume {
     test_prepare_base($vm_name, $domain);
     ok($domain->is_base,"[$vm_name] Domain ".$domain->name." sould be base");
     my $domain_clone = test_clone($vm_name, $domain);
+    $domain->shutdown_now($USER)    if $domain->is_active;
+    $domain_clone->shutdown_now($USER)    if $domain->is_active;
     $domain = undef;
     $domain_clone = undef;
 
@@ -345,7 +351,6 @@ sub test_domain_swap {
         or exit;
 
     }
-
 }
 
 sub test_search($vm_name) {
