@@ -189,7 +189,8 @@ sub test_display_ports($vm_name) {
             if ($type eq 'spice') {
                 is(_nat_ports($domain),0);
             } else {
-                is(_nat_ports($domain),1);
+                my @nat_ports = _nat_ports($domain);
+                is( scalar @nat_ports,1,Dumper(\@nat_ports));
             }
 
             $domain->shutdown_now($USER)    if $domain->is_active;
@@ -199,7 +200,9 @@ sub test_display_ports($vm_name) {
                 ok($ok, $msg);
             }
             $domain0->set_display($type,0);
-            is(_nat_ports($domain),0,"Expecting 0 ports open for domain ".$domain->id) or exit;
+            diag("Removing display for $type");
+            my @nat_ports = _nat_ports($domain);
+            is(scalar @nat_ports,0,"Expecting 0 ports open for domain ".$domain->id." got ".Dumper(\@nat_ports)) or exit;
 
         }
     }
@@ -208,12 +211,15 @@ sub test_display_ports($vm_name) {
 
 sub _nat_ports($domain) {
     my $sth = $test->dbh->prepare(
-        "SELECT count(*) FROM domain_ports "
+        "SELECT * FROM domain_ports "
         ." WHERE id_domain=?"
     );
     $sth->execute($domain->id);
-    my ($n) = $sth->fetchrow;
-    return $n;
+    my @ports;
+    while (my $port = $sth->fetchrow_hashref) {
+        push @ports,($port);
+    }
+    return @ports;
 }
 
 #################################################################

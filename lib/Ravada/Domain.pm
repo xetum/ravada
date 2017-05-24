@@ -1625,11 +1625,12 @@ sub remove_nat($self, $port){
     $sth->execute($self->id, $port);
     $sth->finish;
 
-    $sth = $$CONNECTOR->dbh->prepare(
+    warn "DELETE FROM domain_ports WHERE id_domain=".$self->id." AND internal_port=$port";
+    my $sth2 = $$CONNECTOR->dbh->prepare(
         "DELETE FROM domain_ports WHERE id_domain=? AND internal_port=?"
     );
-    $sth->execute($self->id, $port);
-    $sth->finish;
+    $sth2->execute($self->id, $port);
+    $sth2->finish;
 
 }
 
