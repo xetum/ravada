@@ -3,7 +3,7 @@ package Ravada;
 use warnings;
 use strict;
 
-our $VERSION = '0.2.6';
+our $VERSION = '0.2.7-beta1';
 
 use Carp qw(carp croak);
 use Data::Dumper;
@@ -302,12 +302,16 @@ sub _insert_data {
 
 sub _create_tables {
     my $self = shift;
-    return if $CONNECTOR->dbh->{Driver}{Name} !~ /mysql/i;
+#    return if $CONNECTOR->dbh->{Driver}{Name} !~ /mysql/i;
+
+    my $driver = lc($CONNECTOR->dbh->{Driver}{Name});
+    $DIR_SQL =~ s{(.*)/.*}{$1/$driver};
 
     opendir my $ls,$DIR_SQL or die "$! $DIR_SQL";
     while (my $file = readdir $ls) {
         my ($table) = $file =~ m{(.*)\.sql$};
         next if !$table;
+        next if $table =~ /^insert/;
         $self->_insert_data($table)     if $self->_create_table($table);
     }
     closedir $ls;
