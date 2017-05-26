@@ -1001,7 +1001,7 @@ sub _post_shutdown {
 
     $self->_remove_temporary_machine(@_);
     $self->_remove_iptables(@_);
-#    $self->_close_nat_ports(@_);
+    $self->_close_nat_ports(@_);
     $self->clean_swap_volumes(@_) if $self->id_base() && !$self->is_active;
 
     if (defined $timeout) {
@@ -1113,6 +1113,7 @@ sub _post_start {
     my $self = shift;
 
     $self->_add_iptable_display(@_);
+    # TODO request a future open_iptables if no internal ip ( $self->ip )
     $self->open_nat_ports(@_);
 }
 
@@ -1146,6 +1147,7 @@ sub open_nat_ports {
     my ($local_ip) = $display =~ m{\w+://(.*):\d+};
     my $domain_ip = $self->ip;
     if ( !$domain_ip ) {
+        warn "No domain ip for ".$self->name;
         return;
     }
 
@@ -1298,8 +1300,6 @@ sub _list_used_ports_netstat {
 
 }
 
-=pod
-
 sub _close_nat_ports {
     my $self = shift;
 
@@ -1311,7 +1311,6 @@ sub _close_nat_ports {
     );
     $sth->execute($self->id);
     while (my $row = $sth->fetchrow_hashref) {
-        warn "closing port ".$row->{internal_port}."\n";
         $sth_delete->execute($row->{id});
         my %args_nat = (
                  domain_ip => $row->{internal_ip}
@@ -1323,8 +1322,6 @@ sub _close_nat_ports {
     }
     $sth->finish;
 }
-
-=cut
 
 sub _add_iptable_display {
     my $self = shift;
@@ -1396,6 +1393,19 @@ sub open_iptables {
     $args{user} = $user;
     delete $args{uid};
     $self->_add_iptable_display(%args);
+    $self->open_nat_ports(%args);
+}
+
+=head2 close_iptables
+
+Close iptables for a domain
+
+=cut
+
+sub close_iptables {
+    my $self = shift;
+    $self->_remove_iptables(@_);
+    $self->_close_nat_ports(@_);
 }
 
 sub _obj_iptables {
@@ -1625,13 +1635,15 @@ sub remove_nat($self, $port){
     $sth->execute($self->id, $port);
     $sth->finish;
 
-    warn "DELETE FROM domain_ports WHERE id_domain=".$self->id." AND internal_port=$port";
-    my $sth2 = $$CONNECTOR->dbh->prepare(
-        "DELETE FROM domain_ports WHERE id_domain=? AND internal_port=?"
-    );
-    $sth2->execute($self->id, $port);
-    $sth2->finish;
+    my $sth2 = $$CONNECTOR->dbh->prepare("DELETE FROM domain_ports WHERE id=?");
 
+    my $sth3 = $$CONNECTOR->dbh->prepare(
+        "SELECT * FROM domain_ports WHERE id_domain=? AND internal_port=?");
+    $sth3->execute($self->id, $port);
+    while (my $row = $sth3->fetchrow_hashref) {
+        $sth2->execute($row->{id});
+    }
+    $sth3->finish;
 }
 
 
