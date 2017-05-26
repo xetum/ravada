@@ -134,6 +134,69 @@ sub test_display_children($vm_name) {
 
 }
 
+sub test_display_ports_down($vm_name) {
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my $domain0 = $vm->create_domain( name => new_domain_name()
+        , id_iso => $ID_ISO
+        , id_owner => $USER->id
+    );
+    my %used_port;
+    for my $type ( qw(spice rdp x2go)) {
+        for my $value ( 0 , 1 , 2, 0) {
+            next if $type =~ /spice/i && !$value;
+
+            diag("$type = $value");
+
+            $domain0->shutdown_now($USER)    if $domain0->is_active;
+
+            $domain0->set_display($type => $value);
+
+            my $domain = $vm->search_domain($domain0->name);
+            is($domain->has_display($type),$value);
+
+            my $domain_f = $vm->search_domain($domain0->name);
+            is($domain_f->has_display($type),$value);
+
+            my @nat_ports = _nat_ports($domain);
+            is(scalar @nat_ports,0,"Expecting 0 ports open for domain ".$domain->id
+                ." got ".Dumper(\@nat_ports));
+
+            next if $type =~ /spice/i;
+            $domain0->start(user => $USER, remote_ip => '10.1.1.1');
+            for ( 1 .. 20 ) {
+                last if $domain0->ip;
+                diag("Waiting for ".$domain0->name." network up") if $_> 3;
+                sleep 1;
+            }
+            ok($domain0->ip,"Expecting an IP , got :".($domain0->ip or '<UNDEF>')) or next;
+
+            my $expect_ports = 0;
+            $expect_ports = 1 if $value;
+            @nat_ports = _nat_ports($domain);
+            is(scalar @nat_ports,$expect_ports,"Expecting $expect_ports ports open for domain "
+                .$domain->id." $type=$value "
+                ." got ".Dumper(\@nat_ports));
+
+            $domain->close_iptables(user => $USER);
+            @nat_ports = _nat_ports($domain);
+            is(scalar @nat_ports ,0,"Expecting 0 ports open for domain "
+                .$domain->id." $type=$value "
+                ." got ".Dumper(\@nat_ports));
+
+            $domain->open_iptables(uid => $USER->id, remote_ip => '10.1.1.1');
+            @nat_ports = _nat_ports($domain);
+            is(scalar @nat_ports,$expect_ports,"Expecting $expect_ports ports open for domain "
+                .$domain->id." $type=$value "
+                ." got ".Dumper(\@nat_ports));
+
+
+
+        }
+    }
+}
+
+
 sub test_display_ports($vm_name) {
     my $vm = rvd_back->search_vm($vm_name);
 
@@ -200,7 +263,6 @@ sub test_display_ports($vm_name) {
                 ok($ok, $msg);
             }
             $domain0->set_display($type,0);
-            diag("Removing display for $type");
             my @nat_ports = _nat_ports($domain);
             is(scalar @nat_ports,0,"Expecting 0 ports open for domain ".$domain->id." got ".Dumper(\@nat_ports)) or exit;
 
@@ -241,6 +303,7 @@ SKIP: {
 
     skip($msg,10)   if !$vm;
 
+    test_display_ports_down($vm_name);
     test_display_ports($vm_name);
 
     #TODO
