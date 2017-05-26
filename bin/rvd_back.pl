@@ -21,11 +21,12 @@ my $ADD_USER_LDAP;
 my $IMPORT_DOMAIN;
 my $CHANGE_PASSWORD;
 my $NOFORK;
+my $FOREGROUND;
 
 my $USAGE = "$0 "
         ." [--debug] [--file-config=$FILE_CONFIG] [--add-user=name] [--add-user-ldap=name]"
         ." [--change-password]"
-        ." [-X] [start|stop|status]"
+        ." [--foreground] [start|stop|status]"
         ."\n"
         ." --add-user : adds a new db user\n"
         ." --add-user-ldap : adds a new LDAP user\n"
@@ -38,6 +39,7 @@ GetOptions (       help => \$help
                  ,debug => \$DEBUG
               ,'no-fork'=> \$NOFORK
              ,'config=s'=> \$FILE_CONFIG
+            ,foreground => \$FOREGROUND
            ,'add-user=s'=> \$ADD_USER
       ,'change-password'=> \$CHANGE_PASSWORD
       ,'add-user-ldap=s'=> \$ADD_USER_LDAP
@@ -189,6 +191,14 @@ sub DESTROY {
     
 }
 
+sub start_foreground {
+    my $ravada = Ravada->new();
+    for ( ;; ) {
+        $ravada->_process_all_requests_dont_fork($DEBUG);
+        sleep 1;
+    }
+}
+
 #################################################################
 if ($ADD_USER) {
     add_user($ADD_USER);
@@ -204,4 +214,8 @@ if ($ADD_USER) {
     exit;
 }
 die "Already started" if Proc::PID::File->running( name => 'rvd_back');
-start();
+if ($FOREGROUND) {
+    start_foreground();
+} else {
+    start();
+}
