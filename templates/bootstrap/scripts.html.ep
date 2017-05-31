@@ -29,12 +29,13 @@
     }
 </script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/feedback.js/2012.10.17/feedback.js"></script>
+<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/feedback.js/2012.10.17/feedback.js"></script> -->
+<script src="/js/feedbackjs/feedback.js"></script>
 
 <script type="text/javascript">
 	$(document).ready(function() {
     Feedback({h2cPath:'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.4.1/html2canvas.js',
-                url: '/send/email/uri/on/server',
+                url: '/rest/feedback',
                 label: "Send Feedback",
                 header: "Let's send your feedback!",
                 nextLabel: "",
