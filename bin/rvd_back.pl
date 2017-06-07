@@ -70,7 +70,7 @@ my $PID_LONGS;
 #
 
 sub do_start {
-    warn "Starting rvd_back v".$Ravada::VERSION."\n";
+    warn "Starting rvd_back v".Ravada::version."\n";
     my $old_error = ($@ or '');
     my $cnt_error = 0;
 
