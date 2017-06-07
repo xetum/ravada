@@ -261,7 +261,7 @@ sub test_display_ports($vm_name) {
             is($domain_f->has_display($type),$value);
 
             $domain->shutdown_now($USER)    if $domain->is_active;
-            $domain->start(user => $USER, remote_ip => '10.0.0.1');
+            $domain->start(user => $USER, remote_ip => '127.0.0.1');
 
             for ( 1 .. 60 ) {
                 last if $domain->ip;
