@@ -3,7 +3,7 @@ package Ravada;
 use warnings;
 use strict;
 
-our $VERSION = '0.3.0-alpha1';
+our $VERSION = '0.3.0-alpha';
 
 use Carp qw(carp croak);
 use Data::Dumper;
@@ -364,7 +364,13 @@ sub _connect_dbh {
     my $db_user = ($CONFIG->{db}->{user} or getpwnam($>));;
     my $db_pass = ($CONFIG->{db}->{password} or undef);
     my $db = ( $CONFIG->{db}->{db} or 'ravada' );
-    return DBIx::Connector->new("DBI:$driver:$db"
+    my $host = $CONFIG->{db}->{host};
+
+    my $data_source = "DBI:$driver:$db";
+    $data_source = "DBI:$driver:database=$db;host=$host"    
+        if $host && $host ne 'localhost';
+
+    return DBIx::Connector->new($data_source
                         ,$db_user,$db_pass,{RaiseError => 1
                         , PrintError=> 0 });
 
@@ -1612,7 +1618,13 @@ Returns the version of the module
 =cut
 
 sub version {
-    return $VERSION;
+    my $version = $VERSION;
+    if ($version =~ /beta$/) {
+        my $rev_count = `git rev-list --count --all`;
+        chomp $rev_count;
+        $version .= $rev_count;
+    }
+    return $version;
 }
 
 

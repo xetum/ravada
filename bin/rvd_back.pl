@@ -21,18 +21,20 @@ my $ADD_USER_LDAP;
 my $IMPORT_DOMAIN;
 my $CHANGE_PASSWORD;
 my $NOFORK;
+my $MAKE_ADMIN_USER;
+my $REMOVE_ADMIN_USER;
 my $FOREGROUND;
 
 my $USAGE = "$0 "
         ." [--debug] [--file-config=$FILE_CONFIG] [--add-user=name] [--add-user-ldap=name]"
-        ." [--change-password]"
-        ." [--foreground] [start|stop|status]"
-        ."\n"
+        ." [--change-password] [--make-admin=username]"
+        ." [--foreground] \n"
         ." --add-user : adds a new db user\n"
         ." --add-user-ldap : adds a new LDAP user\n"
         ." --change-password : changes the password of an user\n"
         ." --import-domain : import a domain\n"
-        ." -X : start in foreground\n"
+        ." --make-admin : make user admin\n"
+        ." --foreground : start in foreground\n"
     ;
 
 GetOptions (       help => \$help
@@ -41,6 +43,8 @@ GetOptions (       help => \$help
              ,'config=s'=> \$FILE_CONFIG
             ,foreground => \$FOREGROUND
            ,'add-user=s'=> \$ADD_USER
+        ,'make-admin=s' => \$MAKE_ADMIN_USER
+      ,'remove-admin=s' => \$REMOVE_ADMIN_USER
       ,'change-password'=> \$CHANGE_PASSWORD
       ,'add-user-ldap=s'=> \$ADD_USER_LDAP
       ,'import-domain=s' => \$IMPORT_DOMAIN
@@ -129,7 +133,8 @@ sub start {
 sub add_user {
     my $login = shift;
 
-    my $ravada = Ravada->new();
+    my $ravada = Ravada->new(config => $FILE_CONFIG);
+
     print "$login password: ";
     my $password = <STDIN>;
     chomp $password;
@@ -161,6 +166,8 @@ sub change_password {
     chomp $login;
     return if !$login;
 
+    my $ravada = Ravada->new( config => $FILE_CONFIG );
+    
     my $user = Ravada::Auth::SQL->new(name => $login);
     die "ERROR: Unknown user '$login'\n" if !$user->id;
 
@@ -170,10 +177,33 @@ sub change_password {
     $user->change_password($password);
 }
 
+sub make_admin {
+    my $login = shift;
+
+    my $ravada = Ravada->new(config => $FILE_CONFIG);
+    my $user = Ravada::Auth::SQL->new(name => $login);
+    die "ERROR: Unknown user '$login'\n" if !$user->id;
+
+    $Ravada::USER_DAEMON->make_admin($user->id);
+    print "USER $login granted admin permissions\n";
+}
+
+sub remove_admin {
+    my $login = shift;
+
+    my $ravada = Ravada->new(config => $FILE_CONFIG);
+    my $user = Ravada::Auth::SQL->new(name => $login);
+    die "ERROR: Unknown user '$login'\n" if !$user->id;
+
+    $Ravada::USER_DAEMON->remove_admin($user->id);
+    print "USER $login removed admin permissions, granted normal user permissions.\n";
+}
+
+
 sub import_domain {
     my $name = shift;
     print "Virtual Manager: KVM\n";
-    print "User name : ";
+    print "User name that will own the domain in Ravada : ";
     my $user = <STDIN>;
     chomp $user;
     my $ravada = Ravada->new( config => $FILE_CONFIG );
@@ -212,7 +242,14 @@ if ($ADD_USER) {
 } elsif ($IMPORT_DOMAIN) {
     import_domain($IMPORT_DOMAIN);
     exit;
-}
+} elsif ($MAKE_ADMIN_USER) {
+    make_admin($MAKE_ADMIN_USER);
+    exit;
+} elsif ($REMOVE_ADMIN_USER) {
+    remove_admin($REMOVE_ADMIN_USER);
+    exit;
+} 
+
 die "Already started" if Proc::PID::File->running( name => 'rvd_back');
 if ($FOREGROUND) {
     start_foreground();
