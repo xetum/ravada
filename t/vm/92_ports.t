@@ -32,7 +32,25 @@ my $USER = create_user("foo","bar");
 sub test_no_ports {
     my $vm_name = shift;
 
-    my $domain = create_domain($vm_name);
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my $domain = create_domain($vm_name, $USER);
+    is($domain->is_active,undef) or exit;
+
+    my $remote_ip = '10.0.0.1';
+    my $local_ip = $vm->ip;
+    my $local_port;
+
+    my ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
+    is($n_rule, 0, Dumper($chain)) or exit;
+
+    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
+    is($n_rule,0, Dumper($chain));
+
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+    my $display = $domain->display($USER);
+    ($local_ip, $local_port) = $display =~ m{(\d+\.\d+\.\d+\.\d+):(\d+)};
+    ok(defined $local_port, "Expecting a port in display '$display'") or return;
 }
 
 ##############################################################
