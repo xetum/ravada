@@ -23,6 +23,9 @@ require Exporter;
 @EXPORT = qw(base_domain_name new_domain_name rvd_back remove_old_disks remove_old_domains create_user user_admin wait_request rvd_front init init_vm clean new_pool_name
 create_domain
     test_chain_prerouting
+    search_iptables_rule
+    search_iptables_rule_nat
+    search_iptables_rule_ravada
     search_id_iso
     flush_rules open_ipt
 );
@@ -63,6 +66,7 @@ sub create_domain {
     eval { $domain = $vm->create_domain(name => $name
                     , id_owner => $user->id
                     , @arg_create
+                    , active => 0
            );
     };
     is($@,'');
@@ -380,20 +384,31 @@ sub flush_rules {
     $ipt->flush_chain('filter', $CHAIN);
     $ipt->delete_chain('filter', 'INPUT', $CHAIN);
 
-    my @cmd = ('iptables','-t','nat','-F','PREROUTING');
-    my ($in,$out,$err);
-    run3(\@cmd, \$in, \$out, \$err);
-    die $err if $err;
+    $ipt->flush_chain('nat','PREROUTING');
+#    my @cmd = ('iptables','-t','nat','-F','PREROUTING');
+#    my ($in,$out,$err);
+#    run3(\@cmd, \$in, \$out, \$err);
+#    die $err if $err;
 }
 
-sub search_iptables_rule($local_ip, $local_port, $remote_ip) {
+sub _search_iptables_rule($table,$chain,$local_ip, $remote_ip, $local_port=undef) {
     my $ipt = open_ipt();
 
-    my ($rule_num , $chain_rules)
-        = $ipt->find_ip_rule($remote_ip, $local_ip,'filter', $CHAIN, 'ACCEPT'
-                              , {normalize => 1 , d_port => $local_port });
+    my %pattern = ( normalize => 1 );
+    $pattern{d_port} = $local_port  if $local_port;
 
-    return $rule_num;
+    my ($rule_num , $chain_rules)
+        = $ipt->find_ip_rule($remote_ip, $local_ip,$table, $chain, 'ACCEPT', \%pattern);
+
+    return ($rule_num, $chain_rules);
+}
+
+sub search_iptables_rule_ravada($local_ip, $remote_ip, $local_port=undef) {
+    return _search_iptables_rule('filter',$CHAIN, $local_ip, $remote_ip, $local_port);
+}
+
+sub search_iptables_rule_nat($local_ip, $remote_ip, $local_port=undef) {
+    return _search_iptables_rule('nat','PREROUTING', $local_ip, $remote_ip, $local_port);
 }
 
 sub open_ipt {
