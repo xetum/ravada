@@ -8,6 +8,9 @@ use Hash::Util qw(lock_hash);
 use IPC::Run3 qw(run3);
 use  Test::More;
 
+no warnings "experimental::signatures";
+use feature qw(signatures);
+
 use Ravada;
 use Ravada::Auth::SQL;
 
@@ -381,6 +384,16 @@ sub flush_rules {
     my ($in,$out,$err);
     run3(\@cmd, \$in, \$out, \$err);
     die $err if $err;
+}
+
+sub search_iptables_rule($local_ip, $local_port, $remote_ip) {
+    my $ipt = open_ipt();
+
+    my ($rule_num , $chain_rules)
+        = $ipt->find_ip_rule($remote_ip, $local_ip,'filter', $CHAIN, 'ACCEPT'
+                              , {normalize => 1 , d_port => $local_port });
+
+    return $rule_num;
 }
 
 sub open_ipt {
