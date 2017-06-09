@@ -38,11 +38,13 @@ sub test_no_ports {
 ##############################################################
 
 clean();
+flush_rules();
 
 for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
 
     test_no_ports($vm_name);
 }
 
+flush_rules();
 clean();
 done_testing();
