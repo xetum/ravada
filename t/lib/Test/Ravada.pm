@@ -27,7 +27,8 @@ our $CONT_POOL= 0;
 our $USER_ADMIN;
 
 my %ARG_CREATE_DOM = (
-      kvm => [ id_iso => 1 ]
+      kvm => [ id_iso => 1 ],
+      void => [ ]
 );
 
 sub user_admin {
