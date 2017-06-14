@@ -55,6 +55,7 @@ sub test_one_port {
     die Dumper($n_rule,$chain);
 }
 
+
 # Before messing with ports, everything worked for spice
 sub test_no_ports {
     my $vm_name = shift;
@@ -62,14 +63,18 @@ sub test_no_ports {
     my $vm = rvd_back->search_vm($vm_name);
 
     my $domain = create_domain($vm_name, $USER);
-    is($domain->is_active,undef) or exit;
+
+    $domain->shutdown_now(user => $USER)    if $domain->is_active;
+    ok(!$domain->is_active,"Expecting domain not active, got "
+        .($domain->is_active or 0)) or exit;
 
     my $remote_ip = '10.0.0.1';
     my $local_ip = $vm->ip;
     my $local_port;
 
     my ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
-    is($n_rule, 0, Dumper($chain)) or exit;
+    is($n_rule, 0,"[$vm_name] Expecting no chain, got ".Dumper($chain))
+        or return;
 
     ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
     is($n_rule,0, Dumper($chain));
@@ -77,7 +82,52 @@ sub test_no_ports {
     $domain->start(user => $USER, remote_ip => $remote_ip);
     my $display = $domain->display($USER);
     ($local_ip, $local_port) = $display =~ m{(\d+\.\d+\.\d+\.\d+):(\d+)};
-    ok(defined $local_port, "Expecting a port in display '$display'") or return;
+    ok(defined $local_port, "Expecting a port in display '$display'")
+        or return;
+
+    ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
+    is($n_rule, 1,"[$vm_name] Expecting 1 chain, got ".Dumper($chain));
+
+    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
+    is($n_rule,0, "[$vm_name] Expecting no NAT chain, got ".Dumper($chain));
+
+    # after shutdown
+    #
+    $domain->shutdown_now($USER);
+
+    ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
+    is($n_rule, 0,"[$vm_name] Expecting no chain, got ".Dumper($chain));
+
+    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
+    is($n_rule,0,"[$vm_name] Expecting no NAT chain, got ".Dumper($chain));
+
+    # start again
+    #
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+    $display = $domain->display($USER);
+    ($local_ip, $local_port) = $display =~ m{(\d+\.\d+\.\d+\.\d+):(\d+)};
+    ok(defined $local_port, "Expecting a port in display '$display'")
+        or return;
+
+    ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
+    is($n_rule, 1,"[$vm_name] Expecting 1 chain, got ".Dumper($chain))
+        or exit;
+
+    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
+    is($n_rule,0, "[$vm_name] Expecting no NAT chain, got ".Dumper($chain))
+        or exit;
+
+    $domain->remove($USER);
+
+    # after remove
+
+    ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
+    is($n_rule, 0,"[$vm_name] Expecting no Ravada chain, got "
+                                .Dumper($chain));
+
+    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
+    is($n_rule,0,"[$vm_name] Expecting no NAT chain, got ".Dumper($chain));
+
 }
 
 ##############################################################
@@ -88,6 +138,7 @@ flush_rules();
 for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
 
     test_no_ports($vm_name);
+    test_one_port($vm_name);
 }
 
 flush_rules();
