@@ -28,6 +28,33 @@ my $USER = create_user("foo","bar");
 
 ##############################################################
 
+# Forward one port
+sub test_one_port {
+    my $vm_name = shift;
+
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my $domain = create_domain($vm_name, $USER,'xubuntu');
+
+    my $remote_ip = '10.0.0.1';
+    my $local_ip = $vm->ip;
+    my $local_port;
+
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+    for (1 .. 10) {
+        last if $domain->ip;
+        sleep 1;
+    }
+    ok($domain->ip,"Expecting an IP, got ".($domain->ip or ''));
+    $domain->open_port(22);
+
+    my ($public_ip, $public_port) = $domain->public_address(22);
+    my ($n_rule, $chain)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $local_port);
+
+    die Dumper($n_rule,$chain);
+}
+
 # Before messing with ports, everything worked for spice
 sub test_no_ports {
     my $vm_name = shift;
