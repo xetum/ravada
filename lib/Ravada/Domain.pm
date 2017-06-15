@@ -584,8 +584,8 @@ sub pre_remove { }
 sub _pre_remove_domain {
     my $self = shift;
     eval { $self->id };
-    $self->pre_remove();
     $self->_allow_remove(@_);
+    $self->shutdown_now(@_) if $self->is_active();
     $self->pre_remove();
 }
 
@@ -927,7 +927,8 @@ sub _post_shutdown {
 
     $self->_remove_temporary_machine(@_);
     $self->_remove_iptables(@_);
-    $self->clean_swap_volumes(@_) if $self->id_base() && !$self->is_active;
+    $self->clean_swap_volumes(@_)
+        if $self->is_known && $self->id_base() && !$self->is_active;
 
     if (defined $timeout) {
         if ($timeout<2 && $self->is_active) {
