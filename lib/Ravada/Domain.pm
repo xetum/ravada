@@ -1003,6 +1003,8 @@ sub open_port($self,$internal_port) {
         , $public_ip, $internal_ip);
     $sth->finish;
 
+    # TODO
+    # actually open the port if already started
 }
 
 sub _remove_iptables {
