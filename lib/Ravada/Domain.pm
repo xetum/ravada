@@ -983,6 +983,28 @@ sub add_volume_swap {
     $self->add_volume(%arg, swap => 1);
 }
 
+sub open_port($self,$internal_port) {
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "INSERT INTO domain_ports (id_domain"
+        ."  ,public_port, internal_port"
+        ."  ,public_ip, internal_ip"
+        .")"
+        ." VALUES (?,?,?,?,?)"
+    );
+    my $public_port = $self->_new_free_port();
+
+    my $internal_ip = $self->ip;
+    my $public_ip = $self->_vm->ip;
+
+    # TODO
+    # $public_ip = $self->ip if $self->nat_networking();
+    $sth->execute($self->id
+        , $public_port, $internal_port
+        , $public_ip, $internal_ip);
+    $sth->finish;
+
+}
+
 sub _remove_iptables {
     my $self = shift;
 
