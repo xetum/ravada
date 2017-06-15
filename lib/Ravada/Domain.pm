@@ -1357,6 +1357,21 @@ sub remote_ip {
 
 }
 
+sub _new_free_port {
+    my $self = shift;
+    my $used_port = {};
+    $self->_list_used_ports_sql($used_port);
+    $self->_list_used_ports_netstat($used_port);
+
+    my $free_port = 5900;
+    for (;;) {
+        last if !$used_port->{$free_port};
+        $free_port++ ;
+    }
+    return $free_port;
+
+}
+
 sub _dbh {
     my $self = shift;
     _init_connector() if !$CONNECTOR || !$$CONNECTOR;
