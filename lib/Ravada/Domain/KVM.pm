@@ -1193,6 +1193,22 @@ sub _find_base {
     return $base;
 }
 
+=head2 ip
+
+Returns the IP of the domain.
+
+=cut
+
+sub ip {
+    my $self = shift;
+    my @nics = $self->domain
+        ->get_interface_addresses(
+            Sys::Virt::Domain::INTERFACE_ADDRESSES_SRC_LEASE );
+
+    return if !@nics;
+    return $nics[0]->{addrs}->[0]->{addr};
+}
+
 =head2 clean_swap_volumes
 
 Clean swap volumes. It actually just creates an empty qcow file from the base
