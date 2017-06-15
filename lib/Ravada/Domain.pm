@@ -1378,4 +1378,37 @@ sub _dbh {
     return $$CONNECTOR->dbh;
 }
 
+sub _list_used_ports_sql {
+    my $self = shift;
+    my $used_port = shift;
+
+    my $sth = $$CONNECTOR->dbh->prepare("SELECT public_port FROM domain_ports ");
+    $sth->execute();
+    my $port;
+    $sth->bind_columns(\$port);
+
+    while ($sth->fetch ) { $used_port->{$port}++ };
+
+}
+
+sub _list_used_ports_netstat {
+    my $self = shift;
+    my $used_port = shift;
+
+    my @cmd = ('netstat', '-tln');
+    my ($in, $out, $err);
+    run3(\@cmd, \$in, \$err, \$out);
+
+    for my $line (split /\n/, $out) {
+        my ($port) = $line =~
+                       /^tcp
+                        \s+\d+
+                        \s+\d+
+                        \s+\d+\.\d+\.\d+\.\d+
+                        \:(\d+)/;
+        $used_port->{$port}++ if $port;
+    }
+
+}
+
 1;
