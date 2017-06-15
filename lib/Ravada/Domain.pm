@@ -70,6 +70,10 @@ requires 'set_max_mem';
 
 requires 'hybernate';
 
+# neworking
+
+requires 'ip';
+
 ##########################################################
 
 has 'domain' => (
