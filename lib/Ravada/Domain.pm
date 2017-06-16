@@ -1023,7 +1023,8 @@ sub expose($self,$internal_port) {
     if ($self->is_active) {
         my $remote_ip = $self->remote_ip();
         my $user = $self->remote_user();
-        $self->_add_iptable($user, $remote_ip, $internal_ip, $internal_port);
+        $self->_add_iptable($user, $remote_ip, $public_ip, $public_port);
+        $self->_add_iptable_nat($user, $public_ip, $public_port, $internal_ip, $internal_port);
     }
     return($public_ip, $public_port);
 }
@@ -1139,8 +1140,10 @@ sub _add_iptable($self, $user, $remote_ip, $local_ip, $local_port) {
 	# append rule at the end of the RAVADA chain in the filter table to
 	# allow all traffic from $local_ip to $remote_ip via port $local_port
     #
+    my $filter = 'filter';
+    my $chain = $IPTABLES_CHAIN;
     my @iptables_arg = ($remote_ip
-                        ,$local_ip, 'filter', $IPTABLES_CHAIN, 'ACCEPT',
+                        ,$local_ip, $filter, $chain, 'ACCEPT',
                         ,{'protocol' => 'tcp', 's_port' => 0, 'd_port' => $local_port});
 
 	my ($rv, $out_ar, $errs_ar) = $ipt_obj->append_ip_rule(@iptables_arg);
@@ -1148,13 +1151,17 @@ sub _add_iptable($self, $user, $remote_ip, $local_ip, $local_port) {
     $self->_log_iptable(iptables => \@iptables_arg, remote_ip => $remote_ip, user => $user);
 
     @iptables_arg = ( '0.0.0.0'
-                        ,$local_ip, 'filter', $IPTABLES_CHAIN, 'DROP',
+                        ,$local_ip, $filter, $chain, 'DROP',
                         ,{'protocol' => 'tcp', 's_port' => 0, 'd_port' => $local_port});
 
     ($rv, $out_ar, $errs_ar) = $ipt_obj->append_ip_rule(@iptables_arg);
 
     $self->_log_iptable(iptables => \@iptables_arg, remote_ip => $remote_ip, user => $user);
 
+}
+
+sub _add_iptable_nat($self,$user, $public_ip, $public_port, $internal_ip, $internal_port) {
+    die "NAT";
 }
 
 =head2 open_iptables
@@ -1448,6 +1455,7 @@ sub _remote_data {
 
 sub remote_ip($self) {
     my ( $remote_ip ) = $self->_remote_data();
+    return $remote_ip;
 }
 
 sub remote_user($self) {
@@ -1464,7 +1472,7 @@ sub _new_free_port {
     $self->_list_used_ports_sql($used_port);
     $self->_list_used_ports_netstat($used_port);
 
-    my $free_port = 5900;
+    my $free_port = 5950;
     for (;;) {
         last if !$used_port->{$free_port};
         $free_port++ ;
