@@ -1100,10 +1100,10 @@ sub _post_resume {
 sub _post_start {
     my $self = shift;
 
-    $self->_add_iptable(@_);
+    $self->_add_iptable_display(@_);
 }
 
-sub _add_iptable {
+sub _add_iptable_display {
     my $self = shift;
     return if scalar @_ % 2;
     my %args = @_;
@@ -1111,10 +1111,14 @@ sub _add_iptable {
     my $remote_ip = $args{remote_ip} or return;
 
     my $user = $args{user};
-    my $uid = $user->id;
 
     my $display = $self->display($user);
     my ($local_ip, $local_port) = $display =~ m{\w+://(.*):(\d+)};
+
+    $self->_add_iptable( $user, $remote_ip, $local_ip, $local_port);
+}
+
+sub _add_iptable($self, $user, $remote_ip, $local_ip, $local_port) {
 
     my $ipt_obj = _obj_iptables();
 	# append rule at the end of the RAVADA chain in the filter table to
@@ -1126,15 +1130,15 @@ sub _add_iptable {
 
 	my ($rv, $out_ar, $errs_ar) = $ipt_obj->append_ip_rule(@iptables_arg);
 
-    $self->_log_iptable(iptables => \@iptables_arg, @_);
+    $self->_log_iptable(iptables => \@iptables_arg, remote_ip => $remote_ip, user => $user);
 
     @iptables_arg = ( '0.0.0.0'
                         ,$local_ip, 'filter', $IPTABLES_CHAIN, 'DROP',
                         ,{'protocol' => 'tcp', 's_port' => 0, 'd_port' => $local_port});
-    
+
     ($rv, $out_ar, $errs_ar) = $ipt_obj->append_ip_rule(@iptables_arg);
-    
-    $self->_log_iptable(iptables => \@iptables_arg, %args);
+
+    $self->_log_iptable(iptables => \@iptables_arg, remote_ip => $remote_ip, user => $user);
 
 }
 
@@ -1159,7 +1163,7 @@ sub open_iptables {
     my $user = Ravada::Auth::SQL->search_by_id($args{uid});
     $args{user} = $user;
     delete $args{uid};
-    $self->_add_iptable(%args);
+    $self->_add_iptable_display(%args);
 }
 
 sub _obj_iptables {
