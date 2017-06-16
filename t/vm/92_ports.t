@@ -41,6 +41,12 @@ sub test_one_port {
 
     $domain->start(user => $USER, remote_ip => $remote_ip);
 
+    my $client_ip = $domain->remote_ip();
+    is($client_ip, $remote_ip);
+
+    my $client_user = $domain->remote_user();
+    is($client_user->id, $USER->id);
+
     _wait_ip($domain);
     ok($domain->ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain->ip or '')) or return;
 

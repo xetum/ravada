@@ -1020,9 +1020,11 @@ sub expose($self,$internal_port) {
         , $public_ip, $internal_ip);
     $sth->finish;
 
-    # TODO
-    # actually open the port if already started
-    #
+    if ($self->is_active) {
+        my $remote_ip = $self->remote_ip();
+        my $user = $self->remote_user();
+        $self->_add_iptable($user, $remote_ip, $internal_ip, $internal_port);
+    }
     return($public_ip, $public_port);
 }
 
@@ -1049,6 +1051,19 @@ sub public_address($self, $internal_port=undef) {
 
     return ($public_ip, $public_port);
 }
+
+=head2 client_ip
+
+Returns the IP of the remote client that requested the start of the domain
+
+=cut
+
+sub client_ip($self) {
+    my @active_iptables = $self->_active_iptables();
+    die Dumper(\@active_iptables);
+}
+
+sub client_user {}
 
 sub _remove_iptables {
     my $self = shift;
@@ -1416,22 +1431,32 @@ sub set_driver_id {
     $sth->finish;
 }
 
-sub remote_ip {
+sub _remote_data {
     my $self = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
-        "SELECT remote_ip FROM iptables "
+        "SELECT remote_ip, id_user FROM iptables "
         ." WHERE "
         ."    id_domain=?"
         ."    AND time_deleted IS NULL"
         ." ORDER BY time_req DESC "
     );
     $sth->execute($self->id);
-    my ($remote_ip) = $sth->fetchrow();
-    $sth->finish;
-    return ($remote_ip or undef);
+    return $sth->fetchrow();
 
 }
+
+sub remote_ip($self) {
+    my ( $remote_ip ) = $self->_remote_data();
+}
+
+sub remote_user($self) {
+    my (undef, $remote_uid) = $self->_remote_data();
+    return Ravada::Auth::SQL->search_by_id($remote_uid) if $remote_uid;
+    return undef;
+}
+
+
 
 sub _new_free_port {
     my $self = shift;
