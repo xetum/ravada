@@ -926,7 +926,7 @@ sub _post_shutdown {
     my $timeout = $arg{timeout};
 
     $self->_remove_temporary_machine(@_);
-    $self->_remove_iptables(@_);
+    $self->_remove_iptables(@_) if $self->is_known();
     $self->clean_swap_volumes(@_)
         if $self->is_known && $self->id_base() && !$self->is_active;
 
