@@ -13,6 +13,7 @@ use Carp qw(carp confess croak cluck);
 use Data::Dumper;
 use Hash::Util qw(lock_hash);
 use Image::Magick;
+use IPC::Run3 qw(run3);
 use JSON::XS;
 use Moose::Role;
 use Sys::Statistics::Linux;
@@ -983,7 +984,17 @@ sub add_volume_swap {
     $self->add_volume(%arg, swap => 1);
 }
 
-sub open_port($self,$internal_port) {
+=head2 expose
+
+Expose a TCP port from the domain
+
+Arguments: number of the port
+
+Returns: public ip and port
+
+=cut
+
+sub expose($self,$internal_port) {
     my $sth = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports (id_domain"
         ."  ,public_port, internal_port"
@@ -991,13 +1002,19 @@ sub open_port($self,$internal_port) {
         .")"
         ." VALUES (?,?,?,?,?)"
     );
-    my $public_port = $self->_new_free_port();
 
     my $internal_ip = $self->ip;
     my $public_ip = $self->_vm->ip;
+    my $public_port = $self->_new_free_port();
 
     # TODO
-    # $public_ip = $self->ip if $self->nat_networking();
+    # if ($self->is_network_nat) {
+    #   $public_ip = $self->_vm->ip;
+    #   $public_port = $self->_new_free_port();
+    # } else {
+    #   $public_ip = $self->ip;
+    #   $public_port = $internal_port
+    # }
     $sth->execute($self->id
         , $public_port, $internal_port
         , $public_ip, $internal_ip);
@@ -1005,6 +1022,32 @@ sub open_port($self,$internal_port) {
 
     # TODO
     # actually open the port if already started
+    #
+    return($public_ip, $public_port);
+}
+
+=head2 public_address
+
+Returns the public IP address and port for a TCP service running in the domain.
+
+Arguments: The internal port
+
+=cut
+
+sub public_address($self, $internal_port=undef) {
+    return $self->_vm->ip if !$internal_port;
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "SELECT public_ip,public_port "
+        ." FROM domain_ports "
+        ." WHERE id_domain=?"
+        ."    AND internal_port=?"
+    );
+
+    $sth->execute($self->id, $internal_port);
+    my ($public_ip, $public_port) = $sth->fetchrow();
+
+    return ($public_ip, $public_port);
 }
 
 sub _remove_iptables {
