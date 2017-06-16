@@ -59,19 +59,21 @@ sub test_one_port {
     my ($n_rule)
         = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
 
-    is($n_rule,1,"Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
+    is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
 
     my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $remote_ip, $public_port);
-    is($n_rule_nat,1,"Expecting nat rule for $remote_ip -> $local_ip:$public_port");
+    is($n_rule_nat,1,"Expecting nat rule for $remote_ip -> $local_ip:$public_port") or exit;
 
 }
 
 sub _wait_ip {
     my $domain = shift;
-    return $domain->ip if $domain->ip;
+    return if $domain->_vm->type !~ /kvm|qemu/i;
 
+    sleep 1;
+    $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]);
     sleep 2;
-    for ( 1 .. 5 ) {
+    for ( 1 .. 6 ) {
         diag("sending enter to ".$domain->name);
         $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]);
         sleep 1;
@@ -192,6 +194,7 @@ for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
 
     test_one_port($vm_name);
     test_no_ports($vm_name);
+
 }
 
 flush_rules();
