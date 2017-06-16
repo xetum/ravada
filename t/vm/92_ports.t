@@ -34,25 +34,63 @@ sub test_one_port {
 
     my $vm = rvd_back->search_vm($vm_name);
 
-    my $domain = create_domain($vm_name, $USER,'xubuntu');
+    my $domain = create_domain($vm_name, $USER,'debian');
 
     my $remote_ip = '10.0.0.1';
     my $local_ip = $vm->ip;
-    my $local_port;
 
     $domain->start(user => $USER, remote_ip => $remote_ip);
-    for (1 .. 10) {
-        last if $domain->ip;
-        sleep 1;
-    }
-    ok($domain->ip,"Expecting an IP, got ".($domain->ip or ''));
-    $domain->open_port(22);
+
+    _wait_ip($domain);
+    ok($domain->ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain->ip or '')) or return;
+
+    my ($public_ip0, $public_port0) = $domain->expose(22);
 
     my ($public_ip, $public_port) = $domain->public_address(22);
-    my ($n_rule, $chain)
-        = search_iptables_rule_ravada($local_ip, $remote_ip, $local_port);
+    is($public_ip, $public_ip0);
+    is($public_port, $public_port0);
 
-    die Dumper($n_rule,$chain);
+    my ($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+
+    is($n_rule,1,"Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
+
+    my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $remote_ip, $public_port);
+    is($n_rule_nat,1,"Expecting nat rule for $remote_ip -> $local_ip:$public_port");
+
+}
+
+sub _wait_ip {
+    my $domain = shift;
+    return $domain->ip if $domain->ip;
+
+    sleep 2;
+    for ( 1 .. 5 ) {
+        diag("sending enter to ".$domain->name);
+        $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]);
+        sleep 1;
+    }
+    for (1 .. 20) {
+        last if $domain->ip;
+        sleep 1;
+        diag("waiting for ".$domain->name." ip") if $_ ==10;
+    }
+    return $domain->ip;
+}
+
+sub add_network_10 {
+    my $requires_password = shift;
+    $requires_password = 1 if !defined $requires_password;
+
+    my $sth = $test->connector->dbh->prepare(
+        "DELETE FROM networks where address='10.0.0.0/24'"
+    );
+    $sth->execute;
+    $sth = $test->connector->dbh->prepare(
+        "INSERT INTO networks (name,address,all_domains,requires_password)"
+        ."VALUES('10','10.0.0.0/24',1,?)"
+    );
+    $sth->execute($requires_password);
 }
 
 
@@ -117,6 +155,13 @@ sub test_no_ports {
     is($n_rule,0, "[$vm_name] Expecting no NAT chain, got ".Dumper($chain))
         or exit;
 
+    my $public_ip_domain = $domain->public_address();
+    is($public_ip_domain, $vm->ip);
+
+    my ($public_ip_address, $public_port_address) = $domain->public_address(22);
+    is($public_ip_address,undef);
+    is($public_port_address,undef);
+
     $domain->remove($USER);
 
     # after remove
@@ -135,10 +180,12 @@ sub test_no_ports {
 clean();
 flush_rules();
 
+add_network_10(0);
+
 for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
 
-    test_no_ports($vm_name);
     test_one_port($vm_name);
+    test_no_ports($vm_name);
 }
 
 flush_rules();
