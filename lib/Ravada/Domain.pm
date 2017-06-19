@@ -1081,7 +1081,11 @@ sub _remove_iptables {
     );
     for my $row ($self->_active_iptables($args->{user})) {
         my ($id, $iptables) = @$row;
-        $ipt_obj->delete_ip_rule(@$iptables);
+        my ($rv, $out, $err) = $ipt_obj->delete_ip_rule(@$iptables);
+        if (!$rv) {
+            warn Dumper($out,$err);
+            exit;
+        }
         $sth->execute(Ravada::Utils::now(), $id);
     }
 }
@@ -1165,7 +1169,7 @@ sub _add_iptable_nat($self,$user, $public_ip, $public_port, $internal_ip, $inter
     my $chain = 'PREROUTING';
     my $ipt_obj = _obj_iptables();
 
-    my @iptables_arg = ( $public_ip, $internal_ip, $filter, $chain, 'DNAT'
+    my @iptables_arg = ( '0.0.0.0/0', $public_ip, $filter, $chain, 'DNAT'
         ,{    protocol => 'tcp',
                 d_port => $public_port
             ,   to_port => $internal_port

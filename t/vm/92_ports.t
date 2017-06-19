@@ -48,7 +48,9 @@ sub test_one_port {
     is($client_user->id, $USER->id);
 
     _wait_ip($domain);
-    ok($domain->ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain->ip or '')) or return;
+
+    my $domain_ip = $domain->ip;
+    ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
 
     my $internal_port = 22;
     my ($public_ip0, $public_port0) = $domain->expose($internal_port);
@@ -63,8 +65,23 @@ sub test_one_port {
     is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
 
     my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
-                        , $domain->ip, $internal_port);
-    is($n_rule_nat,1,"Expecting nat rule for $remote_ip -> $local_ip:$public_port") or exit;
+                        , $domain_ip, $internal_port);
+    is($n_rule_nat,1,"Expecting nat rule for $local_ip:$public_port "
+                ."-> ".$domain_ip.":$internal_port") or exit;
+
+    local $@ = undef;
+    eval { $domain->shutdown_now($USER) };
+    is($@, '');
+
+    ($n_rule) = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+    is($n_rule,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port "
+                    ." got $n_rule ");
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+
+    is($n_rule_nat,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port "
+                    ." got $n_rule_nat ");
 
 }
 
@@ -125,8 +142,10 @@ sub test_no_ports {
     is($n_rule, 0,"[$vm_name] Expecting no chain, got ".Dumper($chain))
         or return;
 
-    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
-    is($n_rule,0, Dumper($chain));
+    my ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+) 
+                        ,qr(.*), qr(\d+));
+
+    is($n_rule_nat,0, Dumper($chain));
 
     $domain->start(user => $USER, remote_ip => $remote_ip);
     my $display = $domain->display($USER);
