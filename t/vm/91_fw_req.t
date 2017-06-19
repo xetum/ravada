@@ -81,7 +81,7 @@ sub test_fw_domain{
         ($local_port) = $display =~ m{\d+\.\d+\.\d+\.\d+\:(\d+)};
         $local_ip = $vm->ip;
 
-        ok(defined $local_port, "Expecting a port in display '$display'") or return;
+        ok(defined $local_port, "[$vm_name] Expecting a port in display '$display'") or return;
     
         ok($domain->is_active);
         my $ipt = open_ipt();
@@ -130,8 +130,9 @@ sub test_fw_domain_pause {
         ($local_port) = $display =~ m{\d+\.\d+\.\d+\.\d+\:(\d+)};
         $local_ip = $vm->ip;
 
-        ok(defined $local_port, "Expecting a port in display '$display'") or return;
-    
+        ok(defined $local_port, "[$vm_name, pause] "
+            ."Expecting a port in display '$display'") or return;
+
         $domain->pause($USER);
         ok($domain->is_paused);
 
