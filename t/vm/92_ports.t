@@ -156,8 +156,11 @@ sub test_no_ports {
     ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
     is($n_rule, 1,"[$vm_name] Expecting 1 chain, got ".Dumper($chain));
 
-    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
-    is($n_rule,0, "[$vm_name] Expecting no NAT chain, got ".Dumper($chain));
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+) 
+                        ,qr(.*), qr(\d+));
+    is($n_rule_nat,0, Dumper($chain));
+
 
     # after shutdown
     #
@@ -166,8 +169,9 @@ sub test_no_ports {
     ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
     is($n_rule, 0,"[$vm_name] Expecting no chain, got ".Dumper($chain));
 
-    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
-    is($n_rule,0,"[$vm_name] Expecting no NAT chain, got ".Dumper($chain));
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+) 
+                        ,qr(.*), qr(\d+));
+    is($n_rule_nat,0,"[$vm_name] Expecting no NAT chain, got ".Dumper($chain));
 
     # start again
     #
@@ -181,8 +185,10 @@ sub test_no_ports {
     is($n_rule, 1,"[$vm_name] Expecting 1 chain, got ".Dumper($chain))
         or exit;
 
-    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
-    is($n_rule,0, "[$vm_name] Expecting no NAT chain, got ".Dumper($chain))
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+) 
+                        ,qr(.*), qr(\d+));
+
+    is($n_rule_nat,0, "[$vm_name] Expecting no NAT chain, got ".Dumper($chain))
         or exit;
 
     my $public_ip_domain = $domain->public_address();
@@ -200,8 +206,11 @@ sub test_no_ports {
     is($n_rule, 0,"[$vm_name] Expecting no Ravada chain, got "
                                 .Dumper($chain));
 
-    ($n_rule, $chain) = search_iptables_rule_nat($local_ip, $remote_ip,);
-    is($n_rule,0,"[$vm_name] Expecting no NAT chain, got ".Dumper($chain));
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+) 
+                        ,qr(.*), qr(\d+));
+
+    is($n_rule_nat,0, Dumper($chain));
+
 
 }
 
@@ -214,6 +223,7 @@ add_network_10(0);
 
 for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
 
+    test_no_ports($vm_name);
     test_one_port($vm_name);
     test_no_ports($vm_name);
 
