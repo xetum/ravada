@@ -1080,10 +1080,10 @@ sub _remove_iptables {
     for my $row ($self->_active_iptables($args->{user})) {
         my ($id, $iptables) = @$row;
         my ($rv, $out, $err) = $ipt_obj->delete_ip_rule(@$iptables);
-        if (!$rv) {
-            warn Dumper($out,$err);
-            exit;
-        }
+#        if (!$rv) {
+#            warn Dumper($out,$err);
+##            exit;
+#        }
         $sth->execute(Ravada::Utils::now(), $id);
     }
 }
