@@ -71,6 +71,7 @@ sub test_one_port {
 sub _wait_ip {
     my $domain = shift;
     return if $domain->_vm->type !~ /kvm|qemu/i;
+    return $domain->ip  if $domain->ip;
 
     sleep 1;
     $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]);
