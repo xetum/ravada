@@ -81,7 +81,7 @@ sub _wait_ip {
         $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]);
         sleep 1;
     }
-    for (1 .. 20) {
+    for (1 .. 30) {
         last if $domain->ip;
         sleep 1;
         diag("waiting for ".$domain->name." ip") if $_ ==10;
