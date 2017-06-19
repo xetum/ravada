@@ -404,7 +404,7 @@ sub _search_iptables_rule($table,$chain,$local_ip, $remote_ip, $local_port=undef
     my ($rule_num , $chain_rules)
         = $ipt->find_ip_rule($remote_ip, $local_ip,$table, $chain, 'ACCEPT', \%pattern);
 
-    _dump_all_rules($table, $chain) if !$rule_num && $table eq'nat'
+    _dump_all_rules($table, $chain) if !$rule_num && $table eq'nat';
     return ($rule_num, $chain_rules);
 }
 
@@ -417,8 +417,24 @@ sub search_iptables_rule_ravada($local_ip, $remote_ip, $local_port=undef) {
     return _search_iptables_rule('filter',$CHAIN, $local_ip, $remote_ip, $local_port);
 }
 
-sub search_iptables_rule_nat($local_ip, $remote_ip, $local_port=undef) {
-    return _search_iptables_rule('nat','PREROUTING', $local_ip, $remote_ip, $local_port);
+sub search_iptables_rule_nat($public_ip, $public_port
+                            ,$internal_ip, $local_port) {
+    my $ipt = IPTables::Parse->new();
+
+    diag("searching for $public_ip:$public_port"
+                    ." -> $internal_ip:$local_port");
+    my ($rule_num, $chain_rules) = ( 0,0 );
+    my $n = 0;
+    for my $rule (@{$ipt->chain_rules('nat','PREROUTING')}) {
+        diag(Dumper($rule));
+        next if $rule->{dst} ne $public_ip
+            || $rule->{d_port} != $public_port
+            || $rule->{to_port} != $local_port
+            || $rule->{to_ip} ne $internal_ip;
+        $rule_num = $n if !$rule_num;
+        $chain_rules++;
+    }
+    return ($rule_num, $chain_rules);
 }
 
 sub open_ipt {
