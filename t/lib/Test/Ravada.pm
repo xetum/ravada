@@ -404,7 +404,13 @@ sub _search_iptables_rule($table,$chain,$local_ip, $remote_ip, $local_port=undef
     my ($rule_num , $chain_rules)
         = $ipt->find_ip_rule($remote_ip, $local_ip,$table, $chain, 'ACCEPT', \%pattern);
 
+    _dump_all_rules($table, $chain) if !$rule_num && $table eq'nat'
     return ($rule_num, $chain_rules);
+}
+
+sub _dump_all_rules($table,$chain) {
+    my $ipt = IPTables::Parse->new();
+    warn(Dumper($ipt->chain_rules($table,$chain)));
 }
 
 sub search_iptables_rule_ravada($local_ip, $remote_ip, $local_port=undef) {
