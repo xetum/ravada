@@ -419,18 +419,22 @@ sub search_iptables_rule_ravada($local_ip, $remote_ip, $local_port=undef) {
 
 sub search_iptables_rule_nat($public_ip, $public_port
                             ,$internal_ip, $local_port) {
+
+    $public_port = qr(^$public_port$)   if !ref($public_port);
+    $internal_ip = qr(^$internal_ip$)   if !ref($internal_ip);
+    $local_port = qr(^$local_port$)   if !ref($local_port);
+
+    diag("Searching for $public_ip:$public_port -> $internal_ip:$local_port");
     my $ipt = IPTables::Parse->new();
 
-    diag("searching for $public_ip:$public_port"
-                    ." -> $internal_ip:$local_port");
     my ($rule_num, $chain_rules) = ( 0,0 );
     my $n = 0;
     for my $rule (@{$ipt->chain_rules('nat','PREROUTING')}) {
-        diag(Dumper($rule));
+        $n++;
         next if $rule->{dst} ne $public_ip
-            || $rule->{d_port} != $public_port
-            || $rule->{to_port} != $local_port
-            || $rule->{to_ip} ne $internal_ip;
+            || ($rule->{dport} !~ $public_port && $rule->{d_porte} !~ $public_port)
+            || $rule->{to_port} !~ $local_port
+            || $rule->{to_ip} !~ $internal_ip;
         $rule_num = $n if !$rule_num;
         $chain_rules++;
     }
