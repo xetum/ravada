@@ -50,9 +50,10 @@ sub test_one_port {
     _wait_ip($domain);
     ok($domain->ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain->ip or '')) or return;
 
-    my ($public_ip0, $public_port0) = $domain->expose(22);
+    my $internal_port = 22;
+    my ($public_ip0, $public_port0) = $domain->expose($internal_port);
 
-    my ($public_ip, $public_port) = $domain->public_address(22);
+    my ($public_ip, $public_port) = $domain->public_address($internal_port);
     is($public_ip, $public_ip0);
     is($public_port, $public_port0);
 
@@ -61,7 +62,8 @@ sub test_one_port {
 
     is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
 
-    my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $remote_ip, $public_port);
+    my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain->ip, $internal_port);
     is($n_rule_nat,1,"Expecting nat rule for $remote_ip -> $local_ip:$public_port") or exit;
 
 }
