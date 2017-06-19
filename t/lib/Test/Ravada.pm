@@ -432,7 +432,7 @@ sub search_iptables_rule_nat($public_ip, $public_port
     for my $rule (@{$ipt->chain_rules('nat','PREROUTING')}) {
         $n++;
         next if $rule->{dst} ne $public_ip
-            || ($rule->{dport} !~ $public_port && $rule->{d_porte} !~ $public_port)
+            || ($rule->{dport} !~ $public_port && $rule->{d_port} !~ $public_port)
             || $rule->{to_port} !~ $local_port
             || $rule->{to_ip} !~ $internal_ip;
         $rule_num = $n if !$rule_num;
