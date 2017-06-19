@@ -69,6 +69,9 @@ sub test_one_port {
     is($n_rule_nat,1,"Expecting nat rule for $local_ip:$public_port "
                 ."-> ".$domain_ip.":$internal_port") or exit;
 
+    #################################################################
+    #
+    # shutdown
     local $@ = undef;
     eval { $domain->shutdown_now($USER) };
     is($@, '');
@@ -81,6 +84,123 @@ sub test_one_port {
                         , $domain_ip, $internal_port);
 
     is($n_rule_nat,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port "
+                    ." got $n_rule_nat ");
+
+    #################################################################
+    # start
+    #
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+
+($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+
+    is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+    is($n_rule_nat,1,"Expecting nat rule for $local_ip:$public_port "
+                ."-> ".$domain_ip.":$internal_port") or exit;
+
+    #################################################################
+    #
+    # remove
+    local $@ = undef;
+    eval { $domain->remove($USER) };
+    is($@, '');
+
+    ($n_rule) = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+    is($n_rule,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port "
+                    ." got $n_rule ");
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+
+    is($n_rule_nat,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port "
+                    ." got $n_rule_nat ");
+
+}
+
+sub test_two_ports {
+    my $vm_name = shift;
+
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my $domain = create_domain($vm_name, $USER,'debian');
+
+    my $remote_ip = '10.0.0.1';
+    my $local_ip = $vm->ip;
+
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+
+    my $client_ip = $domain->remote_ip();
+    is($client_ip, $remote_ip);
+
+    my $client_user = $domain->remote_user();
+    is($client_user->id, $USER->id);
+
+    _wait_ip($domain);
+
+    my $domain_ip = $domain->ip;
+    ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
+
+    my $internal_port1 = 1;
+    my ($public_ip1, $public_port1) = $domain->expose($internal_port1);
+
+    my $internal_port2 = 2;
+    my ($public_ip2, $public_port2) = $domain->expose($internal_port2);
+    is ($public_ip2, $public_ip1);
+
+    ok($public_port1 ne $public_port2,"Expecting two different ports "
+        ." $public_port1 $public_port2 ");
+
+
+    my ($public_ip, $public_port) = $domain->public_address($internal_port1);
+    is($public_ip, $public_ip);
+    is($public_port, $public_port1);
+
+    my ($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port1);
+
+    is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port1") or exit;
+
+
+    ($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port2);
+
+    is($n_rule,5,"Expecting rule for $remote_ip -> $local_ip:$public_port2") or exit;
+
+
+    my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port1
+                        , $domain_ip, $internal_port1);
+    is($n_rule_nat,1,"Expecting nat rule for $local_ip:$public_port1"
+                ."-> ".$domain_ip.":$internal_port1") or exit;
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port2
+                        , $domain_ip, $internal_port2);
+    is($n_rule_nat,2,"Expecting nat rule for $local_ip:$public_port2"
+                ."-> ".$domain_ip.":$internal_port2") or exit;
+
+    local $@ = undef;
+    eval { $domain->shutdown_now($USER) };
+    is($@, '');
+    ($n_rule) = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port1);
+    is($n_rule,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port1 "
+                    ." got $n_rule ");
+
+    ($n_rule) = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port2);
+    is($n_rule,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port2 "
+                    ." got $n_rule ");
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port1
+                        , $domain_ip, $internal_port1);
+
+    is($n_rule_nat,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port1 "
+                    ." got $n_rule_nat ");
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port2
+                        , $domain_ip, $internal_port2);
+
+    is($n_rule_nat,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port2 "
                     ." got $n_rule_nat ");
 
 }
@@ -142,7 +262,7 @@ sub test_no_ports {
     is($n_rule, 0,"[$vm_name] Expecting no chain, got ".Dumper($chain))
         or return;
 
-    my ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+) 
+    my ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+)
                         ,qr(.*), qr(\d+));
 
     is($n_rule_nat,0, Dumper($chain));
@@ -157,7 +277,7 @@ sub test_no_ports {
     is($n_rule, 1,"[$vm_name] Expecting 1 chain, got ".Dumper($chain));
 
 
-    ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+) 
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+)
                         ,qr(.*), qr(\d+));
     is($n_rule_nat,0, Dumper($chain));
 
@@ -169,7 +289,7 @@ sub test_no_ports {
     ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
     is($n_rule, 0,"[$vm_name] Expecting no chain, got ".Dumper($chain));
 
-    ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+) 
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+)
                         ,qr(.*), qr(\d+));
     is($n_rule_nat,0,"[$vm_name] Expecting no NAT chain, got ".Dumper($chain));
 
@@ -227,6 +347,7 @@ for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
     test_one_port($vm_name);
     test_no_ports($vm_name);
 
+    test_two_ports($vm_name);
 }
 
 flush_rules();
