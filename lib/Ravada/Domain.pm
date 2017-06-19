@@ -1064,8 +1064,6 @@ sub client_ip($self) {
     die Dumper(\@active_iptables);
 }
 
-sub client_user {}
-
 sub _remove_iptables {
     my $self = shift;
 
