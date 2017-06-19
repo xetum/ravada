@@ -424,7 +424,7 @@ sub search_iptables_rule_nat($public_ip, $public_port
     $internal_ip = qr(^$internal_ip$)   if !ref($internal_ip);
     $local_port = qr(^$local_port$)   if !ref($local_port);
 
-    diag("Searching for $public_ip:$public_port -> $internal_ip:$local_port");
+#    diag("Searching for $public_ip:$public_port -> $internal_ip:$local_port");
     my $ipt = IPTables::Parse->new();
 
     my ($rule_num, $chain_rules) = ( 0,0 );
