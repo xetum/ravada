@@ -1495,8 +1495,8 @@ Returns the user that launched this virtual machine
 
 sub remote_user($self) {
     my (undef, $remote_uid) = $self->_remote_data();
-    return Ravada::Auth::SQL->search_by_id($remote_uid) if $remote_uid;
-    return undef;
+    return if !$remote_uid;
+    return Ravada::Auth::SQL->search_by_id($remote_uid);
 }
 
 
