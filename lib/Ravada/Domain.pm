@@ -1476,10 +1476,22 @@ sub _remote_data {
 
 }
 
+=head2 remote_ip
+
+Returns the IP of the remote host that launched this virtual machine
+
+=cut
+
 sub remote_ip($self) {
     my ( $remote_ip ) = $self->_remote_data();
     return $remote_ip;
 }
+
+=head2 remote_user
+
+Returns the user that launched this virtual machine
+
+=cut
 
 sub remote_user($self) {
     my (undef, $remote_uid) = $self->_remote_data();
