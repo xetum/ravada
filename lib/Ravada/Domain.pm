@@ -1161,7 +1161,28 @@ sub _add_iptable($self, $user, $remote_ip, $local_ip, $local_port) {
 }
 
 sub _add_iptable_nat($self,$user, $public_ip, $public_port, $internal_ip, $internal_port) {
-    die "NAT";
+    my $filter = 'nat';
+    my $chain = 'PREROUTING';
+    my $ipt_obj = _obj_iptables();
+
+    my @iptables_arg = ( $public_ip, $internal_ip, $filter, $chain, 'DNAT'
+        ,{    protocol => 'tcp',
+                d_port => $public_port
+            ,   to_port => $internal_port
+            ,   to_ip => $internal_ip
+        }
+    );
+    my ($rv, $out_ar, $errs_ar) = $ipt_obj->run_ipt_cmd(
+        "/sbin/iptables -t nat -A PREROUTING"
+        ." -d $public_ip"
+        ." -m tcp -p tcp --dport $public_port"
+        ." -j DNAT --to-destination $internal_ip:$internal_port"
+    );
+    warn Dumper($out_ar);
+    warn Dumper($errs_ar);
+
+    $self->_log_iptable(iptables => \@iptables_arg
+            , remote_ip => $public_ip     , user => $user);
 }
 
 =head2 open_iptables
