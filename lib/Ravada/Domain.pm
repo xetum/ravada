@@ -1182,8 +1182,6 @@ sub _add_iptable_nat($self,$user, $public_ip, $public_port, $internal_ip, $inter
         ." -m tcp -p tcp --dport $public_port"
         ." -j DNAT --to-destination $internal_ip:$internal_port"
     );
-    warn Dumper($out_ar);
-    warn Dumper($errs_ar);
 
     $self->_log_iptable(iptables => \@iptables_arg
             , remote_ip => $public_ip     , user => $user);
