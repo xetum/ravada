@@ -55,6 +55,8 @@ sub test_one_port {
     my $internal_port = 22;
     my ($public_ip0, $public_port0) = $domain->expose($internal_port);
 
+    is(scalar $domain->list_ports,1);
+
     my ($public_ip, $public_port) = $domain->public_address($internal_port);
     is($public_ip, $public_ip0);
     is($public_port, $public_port0);
