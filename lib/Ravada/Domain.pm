@@ -1029,6 +1029,17 @@ sub expose($self,$internal_port) {
     return($public_ip, $public_port);
 }
 
+sub list_ports($self) {
+    my $sth = $$CONNECTOR->dbh->prepare("SELECT * FROM domain_ports "
+        ." WHERE id_domain=?");
+    $sth->execute($self->id);
+    my @ports;
+    while (my $row = $sth->fetchrow_hashref) {
+        push @ports,($row);
+    }
+    return @ports;
+}
+
 =head2 public_address
 
 Returns the public IP address and port for a TCP service running in the domain.
