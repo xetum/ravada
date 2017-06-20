@@ -291,6 +291,8 @@ get '/machine/info/(:id).(:type)' => sub {
 };
 
 any '/machine/settings/(:id).(:type)' => sub {
+    my ($c) = @_;
+    return expose_port(@_) if $c->param('expose');
     return settings_machine(@_);
 };
 
@@ -1233,6 +1235,15 @@ sub manage_machine {
     _enable_buttons($c, $domain);
 
     $c->render( template => 'main/manage_machine');
+}
+
+sub expose_port {
+    my $c = shift;
+    my ($domain) = _search_requested_machine($c);
+    return $c->render("Domain not found")   if !$domain;
+    $domain->expose($c->param("port_new"),$c->param("desc_new"));
+    return $c->render(template => 'main/settings_machine'
+        , action => $c->req->url->to_abs->path);
 }
 
 sub settings_machine {
