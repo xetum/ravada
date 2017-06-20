@@ -1,0 +1,20 @@
+<div class="panel-body">
+%   if ($message) {
+        <div class="panel panel-success">
+            <div class="panel-heading"><%= $message %></div>
+        </div>
+%   }
+    <div class="row">
+    <form class="form-horizontal" action="<%= $action %>" method="post">
+        <div class="col-md-6">
+            <div >
+
+                <div>
+                    <span class="col-lg-2 control-label"><label for="port_new">TCP</label></span>
+                    <div class="col-lg-10"><input type="text"></div>
+                </div>
+            </div>
+        </div>
+    </form>
+    </div>
+</div>
