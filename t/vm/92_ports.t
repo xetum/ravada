@@ -216,6 +216,70 @@ sub test_no_ports {
 
 }
 
+# expose a port when the host is down
+sub test_host_down {
+    my $vm_name = shift;
+
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my $domain = create_domain($vm_name, $USER,'debian');
+
+    my $remote_ip = '10.0.0.1';
+    my $local_ip = $vm->ip;
+
+    $domain->shutdown_now($USER)    if $domain->is_active;
+
+    my $internal_port = 22;
+    my ($public_ip0, $public_port0);
+    eval { ($public_ip0, $public_port0) = $domain->expose($internal_port) };
+    is($@,'') or return;
+
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+
+    my $client_ip = $domain->remote_ip();
+    is($client_ip, $remote_ip);
+
+    my $client_user = $domain->remote_user();
+    is($client_user->id, $USER->id);
+
+    _wait_ip($domain);
+
+    my $domain_ip = $domain->ip;
+    ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
+
+
+    is(scalar $domain->list_ports,1);
+
+    my ($public_ip, $public_port) = $domain->public_address($internal_port);
+    is($public_ip, $public_ip0);
+    is($public_port, $public_port0);
+
+    my ($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+
+    is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
+
+    my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+    is($n_rule_nat,1,"Expecting nat rule for $local_ip:$public_port "
+                ."-> ".$domain_ip.":$internal_port") or exit;
+
+    local $@ = undef;
+    eval { $domain->shutdown_now($USER) };
+    is($@, '');
+
+    ($n_rule) = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+    is($n_rule,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port "
+                    ." got $n_rule ");
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+
+    is($n_rule_nat,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port "
+                    ." got $n_rule_nat ");
+
+}
+
 ##############################################################
 
 clean();
@@ -229,6 +293,7 @@ for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
     test_one_port($vm_name);
     test_no_ports($vm_name);
 
+    test_host_down($vm_name);
 }
 
 flush_rules();
