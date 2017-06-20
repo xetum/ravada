@@ -994,13 +994,17 @@ Returns: public ip and port
 
 =cut
 
-sub expose($self,$internal_port) {
+sub expose($self,$internal_port, $name=undef) {
+
+    _init_connector();
+
     my $sth = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports (id_domain"
         ."  ,public_port, internal_port"
         ."  ,public_ip, internal_ip"
+        ."  ,name"
         .")"
-        ." VALUES (?,?,?,?,?)"
+        ." VALUES (?,?,?,?,?,?)"
     );
 
     my $internal_ip = $self->ip;
@@ -1017,7 +1021,7 @@ sub expose($self,$internal_port) {
     # }
     $sth->execute($self->id
         , $public_port, $internal_port
-        , $public_ip, $internal_ip);
+        , $public_ip, $internal_ip, ($name or undef));
     $sth->finish;
 
     if ($self->is_active) {
