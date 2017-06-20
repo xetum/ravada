@@ -1007,7 +1007,8 @@ sub expose($self,$internal_port, $name=undef) {
         ." VALUES (?,?,?,?,?,?)"
     );
 
-    my $internal_ip = $self->ip;
+    my $internal_ip;
+    $internal_ip = $self->ip if $self->is_active;
     my $public_ip = $self->_vm->ip;
     my $public_port = $self->_new_free_port();
 
