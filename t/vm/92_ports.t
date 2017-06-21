@@ -96,7 +96,7 @@ sub test_one_port {
 ($n_rule)
         = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
 
-    is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
+    is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port") or do { dump_all_rules('filter','RAVADA'); exit};
 
     ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
                         , $domain_ip, $internal_port);

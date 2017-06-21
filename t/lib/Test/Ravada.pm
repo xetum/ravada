@@ -28,6 +28,7 @@ create_domain
     search_iptables_rule_ravada
     search_id_iso
     flush_rules open_ipt
+    dump_all_rules
 );
 
 our $DEFAULT_CONFIG = "t/etc/ravada.conf";
@@ -407,7 +408,7 @@ sub _search_iptables_rule($table,$chain,$local_ip, $remote_ip, $local_port=undef
     return ($rule_num, $chain_rules);
 }
 
-sub _dump_all_rules($table,$chain) {
+sub dump_all_rules($table,$chain) {
     my $ipt = IPTables::Parse->new();
     warn(Dumper($ipt->chain_rules($table,$chain)));
 }
