@@ -1034,6 +1034,12 @@ sub expose($self,$internal_port, $name=undef) {
     return($public_ip, $public_port);
 }
 
+=head2 list_ports
+
+List of exposed TCP ports
+
+=cut
+
 sub list_ports($self) {
     my $sth = $$CONNECTOR->dbh->prepare("SELECT * FROM domain_ports "
         ." WHERE id_domain=?");
