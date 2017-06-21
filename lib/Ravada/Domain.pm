@@ -1121,6 +1121,11 @@ sub _post_start {
     $self->_add_iptable_display(@_);
 }
 
+sub _open_iptables($self) {
+    $self->_add_iptable($user, $remote_ip, $public_ip, $public_port);
+    $self->_add_iptable_nat($user, $public_ip, $public_port, $internal_ip, $internal_port);
+}
+
 sub _add_iptable_display {
     my $self = shift;
     return if scalar @_ % 2;
