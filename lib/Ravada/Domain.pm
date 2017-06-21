@@ -1140,6 +1140,10 @@ sub _post_start {
 
 sub _open_iptables {
     my $self = shift;
+
+    # we need the remote_ip => ip , user => user
+    return if scalar @_ % 2 ==1;
+
     my %args = @_;
     my $user = $args{user};
     my $remote_ip = $args{remote_ip};
