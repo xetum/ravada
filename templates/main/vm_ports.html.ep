@@ -1,0 +1,29 @@
+<div class="panel-body">
+%   if ($message) {
+        <div class="panel panel-success">
+            <div class="panel-heading"><%= $message %></div>
+        </div>
+%   }
+    <div class="row">
+%   my $cols = 6;
+    <form class="form-horizontal" action="<%= $action %>" method="post">
+        <div class="col-md-<%= $cols %>">
+            <div class="col-lg-2">Port</div>
+            <div class="col-lg-5">Description</div>
+        </div>
+        <br/>
+        <div class="col-md-<%= $cols %>">
+            <div class="col-lg-2"><input type="text" size="3" name="port_new"></div>
+            <div class="col-lg-5"><input type="text" size="16" name="desc_new"> </div>
+            <div class="col-lg-2"> <input type="submit" name="expose" value="Expose"></div>
+        </div>
+%       for my $port ($domain->list_ports) {
+        <div class="col-md-<%= $cols %>">
+            <div class="col-lg-2"><%= $port->{internal_port} %></div>
+            <div class="col-lg-5"><%= $port->{name} %></div>
+            <div class="col-lg-2"> <input type="submit" value="Remove"></div>
+        </div>
+%       }
+    </form>
+    </div>
+</div>

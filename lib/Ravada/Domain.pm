@@ -523,7 +523,7 @@ sub _display_file_spice($self,$user) {
         ."title=".$self->name." - Press SHIFT+F12 to exit\n"
         ."enable-smartcard=0\n"
         ."enable-usb-autoshare=1\n"
-        ."delete-this-file=0\n"
+        ."delete-this-file=1\n"
         ."usb-filter=-1,-1,-1,-1,0\n";
 
     $ret .=";" if !$self->tls;
@@ -994,16 +994,21 @@ Returns: public ip and port
 
 =cut
 
-sub expose($self,$internal_port) {
+sub expose($self,$internal_port, $name=undef) {
+
+    _init_connector();
+
     my $sth = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports (id_domain"
         ."  ,public_port, internal_port"
         ."  ,public_ip, internal_ip"
+        ."  ,name"
         .")"
-        ." VALUES (?,?,?,?,?)"
+        ." VALUES (?,?,?,?,?,?)"
     );
 
-    my $internal_ip = $self->ip;
+    my $internal_ip;
+    $internal_ip = $self->ip if $self->is_active;
     my $public_ip = $self->_vm->ip;
     my $public_port = $self->_new_free_port();
 
@@ -1017,7 +1022,7 @@ sub expose($self,$internal_port) {
     # }
     $sth->execute($self->id
         , $public_port, $internal_port
-        , $public_ip, $internal_ip);
+        , $public_ip, $internal_ip, ($name or undef));
     $sth->finish;
 
     if ($self->is_active) {
@@ -1027,6 +1032,17 @@ sub expose($self,$internal_port) {
         $self->_add_iptable_nat($user, $public_ip, $public_port, $internal_ip, $internal_port);
     }
     return($public_ip, $public_port);
+}
+
+sub list_ports($self) {
+    my $sth = $$CONNECTOR->dbh->prepare("SELECT * FROM domain_ports "
+        ." WHERE id_domain=?");
+    $sth->execute($self->id);
+    my @ports;
+    while (my $row = $sth->fetchrow_hashref) {
+        push @ports,($row);
+    }
+    return @ports;
 }
 
 =head2 public_address
