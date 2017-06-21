@@ -1135,11 +1135,35 @@ sub _post_start {
     my $self = shift;
 
     $self->_add_iptable_display(@_);
+    $self->_open_iptables(@_);
 }
 
-sub _open_iptables($self) {
-    $self->_add_iptable($user, $remote_ip, $public_ip, $public_port);
-    $self->_add_iptable_nat($user, $public_ip, $public_port, $internal_ip, $internal_port);
+sub _open_iptables {
+    my $self = shift;
+    my %args = @_;
+    my $user = $args{user};
+    my $remote_ip = $args{remote_ip};
+
+    my @ports = $self->list_ports();
+    return if !@ports;
+
+    # TODO check if no NAT, public ip is domain ip
+    my $public_ip = $self->_vm->ip();
+
+    my $internal_ip = $self->ip();
+    for ( 0 .. 2 ) {
+        $internal_ip = $self->ip();
+        last if $internal_ip;
+        sleep 1;
+    }
+    return if !$internal_ip;
+
+    for my $row (@ports) {
+        $self->_add_iptable($user, $remote_ip, $public_ip
+                            , $row->{public_port});
+        $self->_add_iptable_nat($user, $public_ip, $row->{public_port}
+                                , $internal_ip, $row->{internal_port});
+    }
 }
 
 sub _add_iptable_display {
