@@ -157,15 +157,23 @@ sub test_two_ports {
 
 
     my ($public_ip, $public_port) = $domain->public_address($internal_port1);
-    is($public_ip, $public_ip);
+    is($public_ip, $public_ip1);
     is($public_port, $public_port1);
 
+    # A rule for the first port
     my ($n_rule)
         = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port1);
 
     is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port1") or exit;
 
 
+    # check ip and port for second expose
+    ($public_ip, $public_port) = $domain->public_address($internal_port2);
+    is($public_ip, $public_ip2);
+    is($public_port, $public_port2);
+
+
+    # A rule for the second port
     ($n_rule)
         = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port2);
 
@@ -357,7 +365,7 @@ sub test_host_down {
     $domain->start(user => $USER, remote_ip => $remote_ip);
 
     my $client_ip = $domain->remote_ip();
-    is($client_ip, $remote_ip);
+    is($client_ip, $remote_ip) or exit;
 
     my $client_user = $domain->remote_user();
     is($client_user->id, $USER->id);
@@ -409,6 +417,10 @@ add_network_10(0);
 
 for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
 
+    my $vm = rvd_back->search_vm($vm_name);
+    next if !$vm;
+
+    diag("Testing $vm_name");
     test_no_ports($vm_name);
     test_one_port($vm_name);
     test_no_ports($vm_name);
