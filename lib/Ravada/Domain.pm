@@ -995,9 +995,11 @@ Returns: public ip and port
 
 =cut
 
-sub expose($self,$internal_port, $name=undef) {
+sub expose($self, $user, $internal_port, $name=undef) {
 
     _init_connector();
+
+    $self->_allow_manage($user);
 
     my $sth = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports (id_domain"
@@ -1028,11 +1030,25 @@ sub expose($self,$internal_port, $name=undef) {
 
     if ($self->is_active) {
         my $remote_ip = $self->remote_ip();
-        my $user = $self->remote_user();
         $self->_add_iptable($user, $remote_ip, $public_ip, $public_port);
         $self->_add_iptable_nat($user, $public_ip, $public_port, $internal_ip, $internal_port);
     }
     return($public_ip, $public_port);
+}
+
+sub remove_expose($self, $user, $internal_port) {
+    $self->_init_connector();
+    $self->_allow_manage($user);
+
+    my ($public_ip, $public_port) = $self->public_address($internal_port);
+    $self->_remove_iptables(user => $user, d_port => $public_port)
+        if $public_port;
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "DELETE FROM domain_ports WHERE id_domain=? AND internal_port=?"
+    );
+    $sth->execute($self->id, $internal_port);
+
 }
 
 =head2 list_ports
