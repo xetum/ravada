@@ -6,6 +6,7 @@ use  Carp qw(carp confess);
 use  Data::Dumper;
 use Hash::Util qw(lock_hash);
 use IPC::Run3 qw(run3);
+use JSON::XS;
 use  Test::More;
 
 no warnings "experimental::signatures";
@@ -29,6 +30,7 @@ create_domain
     search_id_iso
     flush_rules open_ipt
     dump_all_rules
+    search_sql_iptables
 );
 
 our $DEFAULT_CONFIG = "t/etc/ravada.conf";
@@ -462,6 +464,22 @@ sub open_ipt {
 	my $ipt_obj = IPTables::ChainMgr->new(%opts)
     	or die "[*] Could not acquire IPTables::ChainMgr object";
 
+}
+
+sub search_sql_iptables($local_ip,$remote_ip) {
+    my $sth = $CONNECTOR->dbh->prepare(
+        "SELECT * FROM iptables WHERE remote_ip=? "
+        ." AND time_deleted is null"
+    );
+
+    my @iptables;
+    $sth->execute($remote_ip);
+    while (my $row = $sth->fetchrow_hashref) {
+        my $iptables = decode_json($row->{iptables});
+        next if $iptables->[1] ne $local_ip;
+        push @iptables,($row);
+    }
+    return @iptables;
 }
 
 
