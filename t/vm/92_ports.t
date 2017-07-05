@@ -47,13 +47,13 @@ sub test_one_port {
     my $client_user = $domain->remote_user();
     is($client_user->id, $USER->id);
 
-    _wait_ip($domain);
+    _wait_ip($vm_name, $domain);
 
     my $domain_ip = $domain->ip;
     ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
 
     my $internal_port = 22;
-    my ($public_ip0, $public_port0) = $domain->expose($internal_port);
+    my ($public_ip0, $public_port0) = $domain->expose($USER,$internal_port);
 
     is(scalar $domain->list_ports,1);
 
@@ -122,7 +122,8 @@ sub test_one_port {
 
 }
 
-sub test_two_ports {
+# Remove expose port
+sub test_remove_expose {
     my $vm_name = shift;
 
     my $vm = rvd_back->search_vm($vm_name);
@@ -145,11 +146,88 @@ sub test_two_ports {
     my $domain_ip = $domain->ip;
     ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
 
+    my $internal_port = 22;
+    my ($public_ip0, $public_port0) = $domain->expose($USER,$internal_port);
+
+    is(scalar $domain->list_ports,1);
+
+    my ($public_ip, $public_port) = $domain->public_address($internal_port);
+    is($public_ip, $public_ip0);
+    is($public_port, $public_port0);
+
+    my ($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+
+    is($n_rule,3,"Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
+
+    my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+    is($n_rule_nat,1,"Expecting nat rule for $local_ip:$public_port "
+                ."-> ".$domain_ip.":$internal_port") or exit;
+
+    #################################################################
+    #
+    # remove expose
+    local $@ = undef;
+    eval { $domain->remove_expose($USER,$internal_port) };
+    is($@, '');
+
+    ($n_rule) = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+    is($n_rule,0,"[$vm_name] Expecting 0 rules for "
+                    ."$remote_ip -> $local_ip:$public_port "
+                    ." got $n_rule ") or exit;
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+
+    is($n_rule_nat,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port "
+                    ." got $n_rule_nat ");
+
+    {
+    my @sql_rules = search_sql_iptables($local_ip, $remote_ip);
+    is(scalar(@sql_rules),2,"[$vm_name] Expecting 0 rules for"
+        ." $remote_ip -> $local_ip, got "
+        .scalar @sql_rules." ".Dumper(\@sql_rules)) or exit;
+    }
+
+    $domain->shutdown_now($USER);
+    {
+    my @sql_rules = search_sql_iptables($local_ip, $remote_ip);
+    is(scalar(@sql_rules),0,"[$vm_name] Expecting 0 rules for"
+        ." $remote_ip -> $local_ip, got "
+        .scalar @sql_rules." ".Dumper(\@sql_rules)) or exit;
+    }
+
+}
+
+sub test_two_ports {
+    my $vm_name = shift;
+
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my $domain = create_domain($vm_name, $USER,'debian');
+
+    my $remote_ip = '10.0.0.1';
+    my $local_ip = $vm->ip;
+
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+
+    my $client_ip = $domain->remote_ip();
+    is($client_ip, $remote_ip);
+
+    my $client_user = $domain->remote_user();
+    is($client_user->id, $USER->id);
+
+    _wait_ip($vm_name, $domain);
+
+    my $domain_ip = $domain->ip;
+    ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
+
     my $internal_port1 = 1;
-    my ($public_ip1, $public_port1) = $domain->expose($internal_port1);
+    my ($public_ip1, $public_port1) = $domain->expose($USER, $internal_port1);
 
     my $internal_port2 = 2;
-    my ($public_ip2, $public_port2) = $domain->expose($internal_port2);
+    my ($public_ip2, $public_port2) = $domain->expose($USER, $internal_port2);
     is ($public_ip2, $public_ip1);
 
     ok($public_port1 ne $public_port2,"Expecting two different ports "
@@ -216,16 +294,23 @@ sub test_two_ports {
 }
 
 sub _wait_ip {
+    my $vm_name = shift;
     my $domain = shift;
     return if $domain->_vm->type !~ /kvm|qemu/i;
     return $domain->ip  if $domain->ip;
 
+    return if $vm_name =~ /KVM/ && ! rvd_back->valid_vm($vm_name);
+
     sleep 1;
-    $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]);
+    eval ' $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]) ';
+    die $@ if $@;
+
+    return if $@;
     sleep 2;
     for ( 1 .. 6 ) {
         diag("sending enter to ".$domain->name);
-        $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]);
+        eval ' $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]) ';
+        die $@ if $@;
         sleep 1;
     }
     for (1 .. 30) {
@@ -286,6 +371,10 @@ sub test_no_ports {
     ($n_rule, $chain) = search_iptables_rule_ravada($local_ip, $remote_ip);
     is($n_rule, 1,"[$vm_name] Expecting 1 chain, got ".Dumper($chain));
 
+    my @sql_rules = search_sql_iptables($local_ip, $remote_ip);
+    is(scalar(@sql_rules),2,"[$vm_name] Expecting 2 rules for"
+        ." $remote_ip -> $local_ip, got "
+        .scalar @sql_rules." ".Dumper(\@sql_rules)) or exit;
 
     ($n_rule_nat) = search_iptables_rule_nat($local_ip,qr(\d+)
                         ,qr(.*), qr(\d+));
@@ -303,6 +392,9 @@ sub test_no_ports {
                         ,qr(.*), qr(\d+));
     is($n_rule_nat,0,"[$vm_name] Expecting no NAT chain, got ".Dumper($chain));
 
+    @sql_rules = search_sql_iptables($local_ip,$remote_ip);
+    is(scalar(@sql_rules),0,"Expecting 0 SQL rules, got "
+        .scalar @sql_rules." ".Dumper(\@sql_rules)) or exit;
     # start again
     #
     $domain->start(user => $USER, remote_ip => $remote_ip);
@@ -359,7 +451,7 @@ sub test_host_down {
 
     my $internal_port = 22;
     my ($public_ip0, $public_port0);
-    eval { ($public_ip0, $public_port0) = $domain->expose($internal_port) };
+    eval { ($public_ip0, $public_port0) = $domain->expose($USER,$internal_port) };
     is($@,'') or return;
 
     $domain->start(user => $USER, remote_ip => $remote_ip);
@@ -370,7 +462,7 @@ sub test_host_down {
     my $client_user = $domain->remote_user();
     is($client_user->id, $USER->id);
 
-    _wait_ip($domain);
+    _wait_ip($vm_name, $domain);
 
     my $domain_ip = $domain->ip;
     ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
