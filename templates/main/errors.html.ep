@@ -1,0 +1,7 @@
+% if (scalar @$error) {
+    <ul>
+%   for my $line ( @$error ) {
+        <li><%= $line %></li>
+%   }
+    </ul>
+% }

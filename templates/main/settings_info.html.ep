@@ -1,0 +1,5 @@
+%   if ($message) {
+        <div class="panel panel-success">
+            <div class="panel-heading"><%= $message %></div>
+        </div>
+%   }
