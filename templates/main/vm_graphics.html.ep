@@ -1,9 +1,4 @@
 <div class="panel-body">
-%   if ($message) {
-        <div class="panel panel-success">
-            <div class="panel-heading"><%= $message %></div>
-        </div>
-%   }
     <div class="row">
     <form class="form-horizontal" action="<%= $action %>" method="post">
         <div class="col-md-6">

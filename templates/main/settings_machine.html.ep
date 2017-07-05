@@ -28,6 +28,7 @@
 %   }
              </ul>
             <div class="tab-content">
+                %= include "main/settings_info"
 % if ( $USER->is_admin ) {
              <div class="tab-pane fade" id="remove" >
     %= include 'main/vm_remove'
