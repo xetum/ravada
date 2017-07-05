@@ -1108,9 +1108,11 @@ sub client_ip($self) {
 sub _remove_iptables {
     my $self = shift;
 
-    my $args = {@_};
+    my %args = @_;
 
-    confess "Missing user=>\$user" if !$args->{user};
+    my $user = delete $args{user} or croak "ERROR: missing user";
+    my $d_port = delete $args{d_port};
+    croak "Unknown params:". join(", ", keys %args) if %args;
 
     my $ipt_obj = _obj_iptables();
 
@@ -1118,8 +1120,13 @@ sub _remove_iptables {
         "UPDATE iptables SET time_deleted=?"
         ." WHERE id=?"
     );
-    for my $row ($self->_active_iptables($args->{user})) {
+    for my $row ($self->_active_iptables($user)) {
         my ($id, $iptables) = @$row;
+        if ($d_port) {
+#            warn "$d_port\n".Dumper($iptables)."\n";
+            next if !exists $iptables->[5]->{d_port}
+                    || $iptables->[5]->{d_port} ne $d_port;
+        }
         my ($rv, $out, $err) = $ipt_obj->delete_ip_rule(@$iptables);
 #        if (!$rv) {
 #            warn Dumper($out,$err);
