@@ -924,11 +924,12 @@ sub _post_shutdown {
     my $self = shift;
 
     my %arg = @_;
-    my $timeout = $arg{timeout};
+    my $timeout = delete $arg{timeout};
+    my $user = delete $arg{user};
 
     $self->_remove_temporary_machine(@_);
-    $self->_remove_iptables(@_) if $self->is_known();
-    $self->clean_swap_volumes(@_)
+    $self->_remove_iptables(user => $user) if $self->is_known();
+    $self->clean_swap_volumes(user => $user)
         if $self->is_known && $self->id_base() && !$self->is_active;
 
     if (defined $timeout) {
@@ -936,11 +937,11 @@ sub _post_shutdown {
             sleep $timeout;
             return $self->_do_force_shutdown() if $self->is_active;
         }
-
+        confess "ERROR: Missing user "  if !$user;
         my $req = Ravada::Request->force_shutdown_domain(
                  name => $self->name
-                , uid => $arg{user}->id
-                 , at => time+$timeout 
+                , uid => $user->id
+                 , at => time+$timeout
         );
     }
 }
