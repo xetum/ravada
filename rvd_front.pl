@@ -292,7 +292,14 @@ get '/machine/info/(:id).(:type)' => sub {
 
 any '/machine/settings/(:id).(:type)' => sub {
     my ($c) = @_;
-    return expose_port(@_) if $c->param('expose');
+
+    my ($domain) = _search_requested_machine($c);
+    return $c->render("Domain not found")   if !$domain;
+
+    $c->stash(port_new => undef);
+    expose_port(@_) if $c->param('expose');
+    remove_expose(@_);
+
     return settings_machine(@_);
 };
 
@@ -1244,6 +1251,17 @@ sub expose_port {
     $domain->expose($c->param("port_new"),$c->param("desc_new"));
     return $c->render(template => 'main/settings_machine'
         , action => $c->req->url->to_abs->path);
+}
+
+sub remove_expose {
+    my $c = shift;
+
+    my ($domain) = _search_requested_machine($c);
+    for my $param_name (grep /^remove_expose_\d+$/
+            ,(@{$c->req->params->names})) {
+        my ($port) = $param_name =~ m{(\d+·)};
+        $domain->remove_expose($port);
+    }
 }
 
 sub settings_machine {
