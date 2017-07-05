@@ -436,8 +436,6 @@ get '/machine/display/#id' => sub {
     return $c->render(data => $domain->display_file($USER));
 };
 
-# Users ##########################################################3
-
 get '/machine/list_ports/#id' => sub {
     my $c = shift;
 
@@ -453,6 +451,7 @@ get '/machine/list_ports/#id' => sub {
     return $c->render(json => $domain->list_ports);
 };
 
+# Users ##########################################################3
 
 ##add user
 
@@ -1260,15 +1259,6 @@ sub manage_machine {
     $c->render( template => 'main/manage_machine');
 }
 
-sub expose_port {
-    my $c = shift;
-    my ($domain) = _search_requested_machine($c);
-    return $c->render("Domain not found")   if !$domain;
-    $domain->expose($c->param("port_new"),$c->param("desc_new"));
-    return $c->render(template => 'main/settings_machine'
-        , action => $c->req->url->to_abs->path);
-}
-
 sub remove_expose {
     my $c = shift;
 
@@ -1277,6 +1267,26 @@ sub remove_expose {
             ,(@{$c->req->params->names})) {
         my ($port) = $param_name =~ m{(\d+·)};
         $domain->remove_expose($port);
+    }
+}
+
+sub expose_port {
+    my $c = shift;
+    my ($domain) = _search_requested_machine($c);
+    return $c->render("Domain not found")   if !$domain;
+
+    if (my $port = $c->param('port_new')) {
+        $c->stash(port_new => $port);
+        if ( grep { $_->{internal_port} eq $port} $domain->list_ports ) {
+            _push_error($c,"Port $port already exposed");
+        } elsif ($port !~ /^\d+$/) {
+            _push_error($c,"Port '$port' is not an integer");
+        } elsif ($port > 65535) {
+            _push_error($c,"Port must be between 1 and 65535");
+        } else {
+            $domain->expose($port,$c->param("desc_new"));
+            $c->stash(port_new => '' );
+        }
     }
 }
 
