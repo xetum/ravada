@@ -1041,6 +1041,8 @@ List of exposed TCP ports
 =cut
 
 sub list_ports($self) {
+    $self->_init_connector();
+
     my $sth = $$CONNECTOR->dbh->prepare("SELECT * FROM domain_ports "
         ." WHERE id_domain=?");
     $sth->execute($self->id);
