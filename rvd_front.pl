@@ -438,6 +438,22 @@ get '/machine/display/#id' => sub {
 
 # Users ##########################################################3
 
+get '/machine/list_ports/#id' => sub {
+    my $c = shift;
+
+    my $id = $c->stash('id');
+
+    my $domain = $RAVADA->search_domain_by_id($id);
+    return $c->render(text => "unknown machine id=$id") if !$id;
+
+    return access_denied($c)
+        if $USER->id ne $domain->id_owner
+        && !$USER->is_admin;
+
+    return $c->render(json => $domain->list_ports);
+};
+
+
 ##add user
 
 any '/users/register' => sub {
