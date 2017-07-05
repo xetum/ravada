@@ -1290,6 +1290,15 @@ sub expose_port {
     }
 }
 
+sub _push_error {
+    my $c = shift;
+    my $msg = shift;
+
+    my $error = ($c->stash('error') or []);
+    push @$error,($msg);
+    $c->stash(error => $error);
+}
+
 sub settings_machine {
     my $c = shift;
     my ($domain) = _search_requested_machine($c);
