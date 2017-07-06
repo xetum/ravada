@@ -31,6 +31,8 @@ eval {
     $VALID_VM{KVM} = 1;
 };
 
+$VALID_VM{Void} = 1 if $0 =~ /\.t$/;
+
 no warnings "experimental::signatures";
 use feature qw(signatures);
 
@@ -1751,6 +1753,8 @@ sub search_vm {
     my $type = shift;
 
     confess "Missing VM type"   if !$type;
+
+    confess "Invalid VM type '$type'\n" if !$VALID_VM{$type};
 
     my $class = 'Ravada::VM::'.uc($type);
 
