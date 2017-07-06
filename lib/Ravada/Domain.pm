@@ -1012,9 +1012,8 @@ Returns: public ip and port
 
 sub expose($self, $user, $internal_port, $name=undef) {
 
-    _init_connector();
-
-    $self->_allow_manage($user);
+    die "User ".$user->name." [".$user->id."] not allowed.\n"
+        if $self->id_owner != $user->id || !$user->is_admin;
 
     my $sth = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports (id_domain"
@@ -1052,8 +1051,9 @@ sub expose($self, $user, $internal_port, $name=undef) {
 }
 
 sub remove_expose($self, $user, $internal_port) {
-    $self->_init_connector();
-    $self->_allow_manage($user);
+
+    die "User ".$user->name." [".$user->id."] not allowed.\n"
+        if $self->id_owner != $user->id || !$user->is_admin;
 
     my ($public_ip, $public_port) = $self->public_address($internal_port);
     $self->_remove_iptables(user => $user, d_port => $public_port)
