@@ -83,7 +83,6 @@ plugin 'RenderFile';
 
 my %config;
 %config = (config => $CONFIG_FRONT->{config}) if $CONFIG_FRONT->{config};
-
 our $RAVADA = Ravada::Front->new(%config);
 
 our $USER;
