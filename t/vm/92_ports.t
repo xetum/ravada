@@ -393,8 +393,6 @@ sub _wait_ip {
     return if $domain->_vm->type !~ /kvm|qemu/i;
     return $domain->ip  if $domain->ip;
 
-    return if $vm_name =~ /KVM/ && ! rvd_back->valid_vm($vm_name);
-
     sleep 1;
     eval ' $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]) ';
     die $@ if $@;

@@ -224,7 +224,7 @@ sub _remove_old_disks_kvm {
     confess "Unknown base domain name " if !$name;
 
 #    my $rvd_back= rvd_back();
-    my $vm = rvd_back()->search_vm('kvm');
+    my $vm = rvd_back()->search_vm('KVM');
     if (!$vm) {
         return;
     }
@@ -352,7 +352,7 @@ sub _qemu_storage_pool {
 }
 
 sub remove_qemu_pools {
-    my $vm = rvd_back->search_vm('kvm') or return;
+    my $vm = rvd_back->search_vm('KVM') or return;
 
     for my $pool  ( $vm->vm->list_all_storage_pools) {
         next if $pool->get_name !~ /^test_/;

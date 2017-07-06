@@ -1299,8 +1299,8 @@ sub remove_expose {
     my ($domain) = _search_requested_machine($c);
     for my $param_name (grep /^remove_expose_\d+$/
             ,(@{$c->req->params->names})) {
-        my ($port) = $param_name =~ m{(\d+·)};
-        $domain->remove_expose($port);
+        my ($port) = $param_name =~ m{(\d+)};
+        $domain->remove_expose($USER,$port);
     }
 }
 
@@ -1318,7 +1318,7 @@ sub expose_port {
         } elsif ($port > 65535) {
             _push_error($c,"Port must be between 1 and 65535");
         } else {
-            $domain->expose($port,$c->param("desc_new"));
+            $domain->expose($USER,$port,$c->param("desc_new"));
             $c->stash(port_new => '' );
         }
     }
