@@ -1647,6 +1647,17 @@ sub _cmd_force_shutdown {
 
 }
 
+sub _cmd_expose {
+    my ($self, $request) = @_;
+    my $uid = $request->args('uid');
+
+    my $user = Ravada::Auth::SQL->search_by_id( $uid);
+    my $domain = $self->search_domain_by_id($request->args('id_domain'));
+
+    $domain->expose($user, $request->args('port'), $request->args('name'));
+
+}
+
 sub _cmd_list_vm_types {
     my $self = shift;
     my $request = shift;
@@ -1707,6 +1718,7 @@ sub _req_method {
           start => \&_cmd_start
          ,pause => \&_cmd_pause
         ,create => \&_cmd_create
+        ,expose => \&_cmd_expose
         ,remove => \&_cmd_remove
         ,resume => \&_cmd_resume
       ,download => \&_cmd_download
