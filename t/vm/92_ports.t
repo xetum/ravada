@@ -592,6 +592,37 @@ sub test_host_down {
 
 }
 
+sub test_req_expose {
+    my $vm_name = shift;
+
+    my $domain = create_domain($vm_name, $USER);
+
+    my $remote_ip = '10.4.5.6';
+
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+
+    my $internal_port = 22;
+    my $req = Ravada::Request->expose(
+                   uid => $USER->id
+            ,port => $internal_port
+            ,id_domain => $domain->id
+    );
+    rvd_back->_process_all_requests_dont_fork();
+
+    is($req->status(),'done');
+    is($req->error(),'');
+
+    is(scalar $domain->list_ports,1) or exit;
+
+    my $vm = rvd_back->search_vm($vm_name);
+
+    my ($public_ip, $public_port) = $domain->public_address($internal_port);
+    is($public_ip, $vm->ip);
+    ok($public_port);
+
+    $domain->remove($USER);
+}
+
 ##############################################################
 
 clean();
@@ -605,6 +636,9 @@ for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
     next if !$vm;
 
     diag("Testing $vm_name");
+
+    test_req_expose($vm_name);
+
     test_no_ports($vm_name);
     test_one_port($vm_name);
     test_no_ports($vm_name);
@@ -612,6 +646,7 @@ for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
     test_host_down($vm_name);
 
     test_two_ports($vm_name);
+
 }
 
 flush_rules();
