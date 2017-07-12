@@ -618,6 +618,7 @@ for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
 
     test_host_down($vm_name);
 
+    flush_rules();
     test_two_ports($vm_name);
 }
 
