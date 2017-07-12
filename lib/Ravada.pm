@@ -1785,6 +1785,18 @@ sub search_vm {
     return;
 }
 
+=head2 valid_vms
+
+Returns a list of valid VM types in this system
+
+  my @valid = $ravada->valid_vms();
+
+=cut
+
+sub valid_vms {
+    return sort keys %VALID_VM;
+}
+
 =head2 import_domain
 
 Imports a domain in Ravada

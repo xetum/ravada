@@ -153,7 +153,7 @@ sub _remove_old_domains_vm {
         return if !$rvd_back;
         $vm = $rvd_back->search_vm($vm_name);
     };
-    diag($@) if $@;
+    diag($@) if $@ && $@ !~ /Invalid VM/i;
 
     return if !$vm;
 
@@ -191,7 +191,7 @@ sub _remove_old_domains_kvm {
         my $rvd_back = rvd_back();
         $vm = $rvd_back->search_vm('KVM');
     };
-    diag($@) if $@;
+    diag($@) if $@ && $@ !~ /Invalid VM/i;
     return if !$vm;
 
     my $base_name = base_domain_name();
@@ -224,7 +224,8 @@ sub _remove_old_disks_kvm {
     confess "Unknown base domain name " if !$name;
 
 #    my $rvd_back= rvd_back();
-    my $vm = rvd_back()->search_vm('KVM');
+    my $vm;
+    eval { $vm = rvd_back()->search_vm('KVM') };
     if (!$vm) {
         return;
     }
