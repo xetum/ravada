@@ -286,6 +286,8 @@ sub test_change_interface {
 
     my $display = $domain->display($USER);
     like($display,qr{spice://\d+.\d+.});
+
+    $domain->remove($USER);
 }
 
 sub set_bogus_ip {
