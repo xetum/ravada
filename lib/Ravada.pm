@@ -1765,7 +1765,8 @@ sub search_vm {
 
     confess "Missing VM type"   if !$type;
 
-    confess "Invalid VM type '$type'\n" if !$VALID_VM{$type};
+    confess "Invalid VM type '$type'\n" 
+        if !$VALID_VM{$type} && !$VALID_VM{uc($type)} && $type ne 'Void';
 
     my $class = 'Ravada::VM::'.uc($type);
 
