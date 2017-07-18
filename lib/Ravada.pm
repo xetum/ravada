@@ -817,13 +817,6 @@ sub search_domain {
     my $name = shift;
     my $import = shift;
 
-    my $vm = $self->search_vm('Void');
-    warn "No Void VM" if !$vm;
-    return if !$vm;
-
-    my $domain = $vm->search_domain($name, $import);
-    return $domain if $domain;
-
     my @vms;
     eval { @vms = $self->vm };
     return if $@ && $@ =~ /No VMs found/i;
@@ -840,6 +833,12 @@ sub search_domain {
         return $domain if $id || $import;
     }
 
+    return if !$VALID_VM{'Void'};
+    my $vm = $self->search_vm('Void');
+    warn "No Void VM" if !$vm;
+    return if !$vm;
+    my $domain = $vm->search_domain($name, $import);
+    return $domain if $domain;
 
     return;
 }
@@ -1766,7 +1765,8 @@ sub search_vm {
 
     confess "Missing VM type"   if !$type;
 
-    confess "Invalid VM type '$type'\n" if !$VALID_VM{$type};
+    confess "Invalid VM type '$type'\n" 
+        if !$VALID_VM{$type} && !$VALID_VM{uc($type)} && $type ne 'Void';
 
     my $class = 'Ravada::VM::'.uc($type);
 

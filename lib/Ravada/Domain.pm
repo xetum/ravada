@@ -1012,7 +1012,8 @@ Returns: public ip and port
 
 sub expose($self, $user, $internal_port, $name=undef) {
 
-    $self->_allow_manage($user);
+    die "User ".$user->name." [".$user->id."] not allowed.\n"
+        if $self->id_owner != $user->id && !$user->is_admin;
 
     my $sth = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports (id_domain"

@@ -53,7 +53,11 @@ sub test_one_port {
     ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
 
     my $internal_port = 22;
-    my ($public_ip0, $public_port0) = $domain->expose($USER,$internal_port);
+    my ($public_ip0, $public_port0);
+    eval {
+       ($public_ip0, $public_port0) = $domain->expose($USER,$internal_port);
+    };
+    is($@,'');
 
     is(scalar $domain->list_ports,1);
 
@@ -349,7 +353,10 @@ sub test_two_ports {
     ($n_rule)
         = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port2);
 
-    is($n_rule,5,"Expecting rule for $remote_ip -> $local_ip:$public_port2") or exit;
+    is($n_rule,5,"Expecting rule for $remote_ip -> $local_ip:$public_port2") or do {
+        dump_all_rules('filter','RAVADA');
+        exit;
+};
 
 
     my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port1
@@ -626,7 +633,6 @@ sub test_req_expose {
 ##############################################################
 
 clean();
-flush_rules();
 
 add_network_10(0);
 
@@ -639,12 +645,14 @@ for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
 
     test_req_expose($vm_name);
 
+    flush_rules();
     test_no_ports($vm_name);
     test_one_port($vm_name);
     test_no_ports($vm_name);
 
     test_host_down($vm_name);
 
+    flush_rules();
     test_two_ports($vm_name);
 
 }
