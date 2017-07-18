@@ -543,7 +543,7 @@ sub _display_file_spice($self,$user) {
     } else {
         $ret .= "port=$port\n";
     }
-    $ret .="password=%s\n"  if $self->spice_password();
+#    $ret .="password=%s\n"  if $self->spice_password();
 
     $ret .=
         "fullscreen=1\n"
