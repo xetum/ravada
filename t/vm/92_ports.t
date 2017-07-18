@@ -51,13 +51,14 @@ sub test_one_port {
 
     my $domain_ip = $domain->ip;
     ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
+    is(scalar $domain->list_ports,0);
 
     my $internal_port = 22;
     my ($public_ip0, $public_port0);
     eval {
        ($public_ip0, $public_port0) = $domain->expose($USER,$internal_port);
     };
-    is($@,'');
+    is($@,'',"[$vm_name] export port $internal_port");
 
     is(scalar $domain->list_ports,1);
 
@@ -628,6 +629,12 @@ sub test_req_expose {
     ok($public_port);
 
     $domain->remove($USER);
+
+    my @sql_iptables = search_sql_iptables($public_ip, $remote_ip);
+    ok(!scalar @sql_iptables,"Expecting 0 iptables SQL , got ".Dumper(\@sql_iptables))
+        or exit;
+
+    is(scalar $domain->list_ports,0) or exit;
 }
 
 ##############################################################
