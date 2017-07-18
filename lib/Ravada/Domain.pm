@@ -612,8 +612,17 @@ sub _after_remove_domain {
         $self->_remove_files_base();
     }
     return if !$self->{_data};
+    $self->_remove_ports_db();
     $self->_remove_base_db();
     $self->_remove_domain_db();
+}
+
+sub _remove_ports_db {
+    my $self = shift;
+
+    my $sth = $$CONNECTOR->dbh->prepare("DELETE FROM domain_ports where id_domain=?");
+    $sth->execute($self->id);
+    $sth->finish;
 }
 
 sub _remove_domain_db {
