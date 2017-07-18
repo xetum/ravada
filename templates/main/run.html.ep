@@ -35,16 +35,20 @@
                 <li><%=l 'Display IP:' %> <b><%= $display_ip %></b></li>
                 <li><%=l 'Display Port:' %> <b><%= $display_port %></b></li>
             </ul>
-            <label for="automatic"><input type="checkbox" ng-click="toggle_auto_start()"
-%           if ($c->session('auto_start')) {
-                checked
-%           }
-            > Start automatically next time</input>
+%           if (!$password) {
+                <label for="automatic"><input type="checkbox" ng-click="toggle_auto_start()"
+%               if ($c->session('auto_start')) {
+                    checked
+%               }
+                > View automatically next time.</label></input><br/>
+%            }
+            On some systems it will download a <i>vv</i> file. Click
+            it to view the display after start.
             <br/>
             <a type="button" class="btn btn-success"
                     ng-click="copy_password()"
                     href="<%= $url_display_file %>">
-                <b><%=l 'start'%></b></a>
+                <b><%=l 'view'%></b></a>
 
         </div>
         <div class="panel-body">

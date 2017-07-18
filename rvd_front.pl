@@ -1128,7 +1128,10 @@ sub show_link {
     _open_iptables($c,$domain)
         if !$req;
     my $uri_file = "/machine/display/".$domain->id;
-    $c->stash(url => $uri_file)  if $c->session('auto_start');
+
+    $c->stash(url => $uri_file)
+        if $c->session('auto_start') && !$domain->spice_password;
+
     my ($display_ip, $display_port) = $uri =~ m{\w+://(\d+\.\d+\.\d+\.\d+):(\d+)};
     my $description = $domain->description;
     $c->stash(description => $description);
