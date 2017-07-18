@@ -128,7 +128,9 @@ sub test_req_create_domain_iso {
     ok(!$req->error,"Error ".$req->error." creating domain ".$name) or return ;
 
     my $n_expected = 1;
-    test_unread_messages($USER, $n_expected, "[$vm_name] create domain $name");
+    my @messages = $USER->unread_messages();
+    ok(scalar @messages == 3 || scalar @messages == 1
+        ,"Expecting 1 or 3 unread messages");
 
     my $req2 = Ravada::Request->open($req->id);
     ok($req2->{id} == $req->id,"iso req2->{id} = ".$req2->{id}." , expecting ".$req->id);
