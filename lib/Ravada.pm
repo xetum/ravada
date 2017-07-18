@@ -1792,6 +1792,13 @@ sub search_vm {
     return;
 }
 
+sub valid_vm {
+    my $self = shift;
+    my $type = shift;
+
+    return $VALID_VM{$type};
+}
+
 =head2 import_domain
 
 Imports a domain in Ravada
