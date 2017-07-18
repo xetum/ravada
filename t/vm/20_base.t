@@ -51,7 +51,6 @@ sub test_create_domain {
                     , id_owner => $USER->id
                     , @{$ARG_CREATE_DOM{$vm_name}})
     };
-
     ok($domain,"No domain $name created with ".ref($vm)." ".($@ or '')) or exit;
     ok($domain->name
         && $domain->name eq $name,"Expecting domain name '$name' , got "
