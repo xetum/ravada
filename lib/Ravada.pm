@@ -1801,7 +1801,7 @@ Returns a list of valid VM types in this system
 =cut
 
 sub valid_vms {
-    return sort keys %VALID_VM;
+    return ( sort keys %VALID_VM );
 }
 
 =head2 valid_vm
