@@ -412,19 +412,6 @@ sub _data {
     return $self->{_data}->{$field};
 }
 
-sub __open {
-    my $self = shift;
-
-    my %args = @_;
-
-    my $id = $args{id} or confess "Missing required argument id";
-    delete $args{id};
-
-    my $row = $self->_select_domain_db ( );
-    return $self->search_domain($row->{name});
-#    confess $row;
-}
-
 =head2 is_known
 
 Returns if the domain is known in Ravada.
@@ -1196,14 +1183,17 @@ sub _remove_iptables {
 sub _clean_iptables {
     my $self = shift;
 
+    warn "checking iptables leftovers";
     my $sth = $$CONNECTOR->dbh->prepare(
         "SELECT id,id_domain,iptables FROM iptables "
-        ."    WHERE time_deleted IS NOT NULL"
+        ."    WHERE time_deleted IS NULL"
     );
     my ( $id, $id_domain, $iptables);
     $sth->bind_columns(\( $id, $id_domain, $iptables));
+    $sth->execute;
     while ($sth->fetch) {
         my $domain = Ravada::Domain->open($id_domain);
+        warn "checking iptables from domain ".$domain->name."\n";
         next if $domain->is_active;
 
         warn "I should remove iptables from domain ".$domain->name."\n";
