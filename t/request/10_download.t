@@ -22,7 +22,7 @@ $Ravada::SECONDS_WAIT_CHILDREN = 1;
 
 for my $vm_name ('KVM') {
     my $rvd_back = rvd_back();
-    my $vm = $rvd_back->search_vm($vm_name);
+    my $vm = $rvd_back->search_vm($vm_name) if $rvd_back->valid_vm($vm_name);
     SKIP: {
         my $msg = "SKIPPED: No virtual managers found";
         if ($vm && $vm_name =~ /kvm/i && $>) {
