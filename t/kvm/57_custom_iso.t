@@ -83,10 +83,10 @@ clean();
 my $vm;
 my $vm_name = 'KVM';
 
-eval { $vm = rvd_back->search_vm('KVM') };
+eval { $vm = rvd_back->search_vm($vm_name) if rvd_back->valid_vm($vm_name) };
 diag($@) if $@;
 SKIP: {
-    my $msg = "SKIPPED test: No KVM backend found";
+    my $msg = "SKIPPED test: No $vm_name backend found";
     if ($vm && $>) {
         $msg = "SKIPPED: Test must run as root";
         $vm = undef;

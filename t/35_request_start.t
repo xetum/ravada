@@ -219,7 +219,7 @@ sub test_screenshot_file {
 remove_old_domains();
 remove_old_disks();
 
-for my $vm_name (qw(KVM Void)) {
+for my $vm_name (rvd_back->valid_vms) {
     my $vmm = $RAVADA->search_vm($vm_name);
 
     SKIP: {

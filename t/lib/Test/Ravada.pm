@@ -353,7 +353,8 @@ sub _qemu_storage_pool {
 }
 
 sub remove_qemu_pools {
-    my $vm = rvd_back->search_vm('KVM') or return;
+    my $vm = rvd_back->search_vm('KVM') if rvd_back->valid_vm('KVM')
+        or return;
 
     for my $pool  ( $vm->vm->list_all_storage_pools) {
         next if $pool->get_name !~ /^test_/;
