@@ -270,7 +270,7 @@ sub list_vm_types {
 
     return $self->{cache}->{vm_types} if $self->{cache}->{vm_types};
 
-    my $result = [Ravada::list_vms()];
+    my $result = [Ravada::valid_vms()];
 
     $self->{cache}->{vm_types} = $result if $result->[0];
 
