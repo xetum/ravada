@@ -1873,13 +1873,7 @@ Returns the version of the module
 =cut
 
 sub version {
-    my $version = $VERSION;
-    if ($version =~ /(alpha|beta)$/) {
-        my $rev_count = `git rev-list --count --all`;
-        chomp $rev_count;
-        $version .= $rev_count;
-    }
-    return $version;
+    return $VERSION;
 }
 
 
