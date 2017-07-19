@@ -137,7 +137,7 @@ before 'remove' => \&_pre_remove_domain;
 before 'prepare_base' => \&_pre_prepare_base;
  after 'prepare_base' => \&_post_prepare_base;
 
-before 'start' => \&_start_preconditions;
+before 'start' => \&_pre_start;
  after 'start' => \&_post_start;
 
 before 'pause' => \&_allow_manage;
@@ -181,7 +181,7 @@ sub _vm_disconnect {
     $self->_vm->disconnect();
 }
 
-sub _start_preconditions{
+sub _pre_start {
     my ($self) = @_;
 
     if (scalar @_ %2 ) {
@@ -189,6 +189,7 @@ sub _start_preconditions{
     } else {
         _allow_manage(@_);
     }
+    _clean_iptables();
     _check_free_memory();
     _check_used_memory(@_);
 
@@ -1174,6 +1175,26 @@ sub _remove_iptables {
 #        }
         $sth->execute(Ravada::Utils::now(), $id);
     }
+}
+
+# clean iptables left from down domains
+
+sub _clean_iptables {
+    my $self = shift;
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "SELECT id,id_domain,iptables FROM iptables "
+        ."    WHERE time_deleted IS NOT NULL"
+    );
+    my ( $id, $id_domain, $iptables);
+    $sth->bind_columns(\( $id, $id_domain, $iptables));
+    while ($sth->fetch) {
+        my $domain = Ravada::Domain->open($id_domain);
+        next if $domain->is_active;
+
+        warn "I should remove iptables from domain ".$domain->name."\n";
+    }
+    $sth->finish;
 }
 
 sub _remove_temporary_machine {
