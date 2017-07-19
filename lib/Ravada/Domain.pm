@@ -951,9 +951,8 @@ sub clone {
 
 sub _post_pause {
     my $self = shift;
-    my $user = shift;
 
-    $self->_remove_iptables(user => $user);
+    $self->_remove_iptables();
 }
 
 sub _pre_shutdown {
@@ -977,7 +976,7 @@ sub _post_shutdown {
     my $user = delete $arg{user};
 
     $self->_remove_temporary_machine(@_);
-    $self->_remove_iptables(user => $user) if $self->is_known();
+    $self->_remove_iptables() if $self->is_known();
     $self->clean_swap_volumes(user => $user)
         if $self->is_known && $self->id_base() && !$self->is_active;
 
@@ -1106,7 +1105,7 @@ sub remove_expose($self, $user, $internal_port) {
     $self->_allow_manage($user);
 
     my ($public_ip, $public_port) = $self->public_address($internal_port);
-    $self->_remove_iptables(user => $user, d_port => $public_port)
+    $self->_remove_iptables(d_port => $public_port)
         if $public_port;
 
     my $sth = $$CONNECTOR->dbh->prepare(
@@ -1172,10 +1171,8 @@ sub client_ip($self) {
 
 sub _remove_iptables {
     my $self = shift;
-
     my %args = @_;
 
-    my $user = delete $args{user} or croak "ERROR: missing user";
     my $d_port = delete $args{d_port};
     croak "Unknown params:". join(", ", keys %args) if %args;
 
@@ -1185,7 +1182,7 @@ sub _remove_iptables {
         "UPDATE iptables SET time_deleted=?"
         ." WHERE id=?"
     );
-    for my $row ($self->_active_iptables($user)) {
+    for my $row ($self->_active_iptables()) {
         my ($id, $iptables) = @$row;
         if ($d_port) {
 #            warn "$d_port\n".Dumper($iptables)."\n";
@@ -1206,7 +1203,6 @@ sub _remove_iptables {
 sub _clean_iptables {
     my $self = shift;
 
-    warn "checking iptables leftovers";
     my $sth = $$CONNECTOR->dbh->prepare(
         "SELECT id,id_domain,iptables FROM iptables "
         ."    WHERE time_deleted IS NULL"
@@ -1216,10 +1212,8 @@ sub _clean_iptables {
     $sth->execute;
     while ($sth->fetch) {
         my $domain = Ravada::Domain->open($id_domain);
-        warn "checking iptables from domain ".$domain->name."\n";
         next if $domain->is_active;
-
-        warn "I should remove iptables from domain ".$domain->name."\n";
+        $domain->_remove_iptables();
     }
     $sth->finish;
 }
@@ -1448,21 +1442,16 @@ sub _log_iptable {
 
 }
 
-sub _active_iptables {
-    my $self = shift;
-    my $user = shift;
-
-    confess "Missing \$user" if !$user;
+sub _active_iptables($self) {
 
     my $sth = $$CONNECTOR->dbh->prepare(
         "SELECT id,iptables FROM iptables "
         ." WHERE "
         ."    id_domain=?"
-        ."    AND id_user=? "
         ."    AND time_deleted IS NULL"
         ." ORDER BY time_req DESC "
     );
-    $sth->execute($self->id, $user->id);
+    $sth->execute($self->id);
     my @iptables;
     while (my ($id, $iptables) = $sth->fetchrow) {
         push @iptables, [ $id, decode_json($iptables)];
