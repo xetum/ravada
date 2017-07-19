@@ -1028,7 +1028,10 @@ sub add_volume_swap {
 
 Expose a TCP port from the domain
 
-Arguments: number of the port
+Arguments: 
+ - user
+ - number of the port
+ - optional name
 
 Returns: public ip and port
 
@@ -1076,6 +1079,17 @@ sub expose($self, $user, $internal_port, $name=undef) {
     }
     return($public_ip, $public_port);
 }
+
+=head2 remove_expose
+
+Remove a exposed TCP port from the domain
+
+Arguments:
+
+ - number of the port
+ - user
+
+=cut
 
 sub remove_expose($self, $user, $internal_port) {
 
