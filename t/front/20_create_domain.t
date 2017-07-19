@@ -32,7 +32,6 @@ my %CREATE_ARGS = (
     ,LXC => { id_template => 1, id_owner => $USER->id }
 );
 
-
 ###################################################################
 
 sub create_args {
@@ -92,7 +91,7 @@ ok(scalar $RVD_FRONT->list_vm_types(),"Expecting some in list_vm_types , got "
 SKIP: {
 for my $vm_name ('Void','KVM','LXC') {
 
-    my $vm = $RVD_BACK->search_vm($vm_name);
+    my $vm = $RVD_BACK->search_vm($vm_name) if $RVD_BACK->valid_vm($vm_name);
     my $msg = "Skipping VM $vm_name in this system";
     if ($vm && $vm_name =~ /kvm/i && $>) {
         $msg = "SKIPPED: Test must run as root";

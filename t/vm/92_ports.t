@@ -18,11 +18,6 @@ my $FILE_CONFIG = 't/etc/ravada.conf';
 
 my @ARG_RVD = ( config => $FILE_CONFIG,  connector => $test->connector);
 
-my %ARG_CREATE_DOM = (
-      KVM => [ id_iso => 1 ]
-    ,Void => [ ]
-);
-
 my $RVD_BACK = rvd_back($test->connector, $FILE_CONFIG);
 my $USER = create_user("foo","bar");
 
@@ -51,13 +46,14 @@ sub test_one_port {
 
     my $domain_ip = $domain->ip;
     ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
+    is(scalar $domain->list_ports,0);
 
     my $internal_port = 22;
     my ($public_ip0, $public_port0);
     eval {
        ($public_ip0, $public_port0) = $domain->expose($USER,$internal_port);
     };
-    is($@,'');
+    is($@,'',"[$vm_name] export port $internal_port");
 
     is(scalar $domain->list_ports,1);
 
@@ -210,10 +206,18 @@ sub test_crash_domain {
 
     my $vm = rvd_back->search_vm($vm_name);
 
+
     my $domain = create_domain($vm_name, $USER,'debian');
 
     my $remote_ip = '10.0.0.1';
     my $local_ip = $vm->ip;
+
+    {
+    my @sql_rules = search_sql_iptables($local_ip, $remote_ip);
+    is(scalar(@sql_rules),0,"[$vm_name] Expecting no rules for"
+        ." $remote_ip -> $local_ip, got "
+        .scalar @sql_rules) or exit;
+    }
 
     $domain->start(user => $USER, remote_ip => $remote_ip);
 
@@ -223,7 +227,7 @@ sub test_crash_domain {
     my $client_user = $domain->remote_user();
     is($client_user->id, $USER->id);
 
-    _wait_ip($domain);
+    _wait_ip($vm_name, $domain);
 
     my $domain_ip = $domain->ip;
     ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
@@ -247,10 +251,16 @@ sub test_crash_domain {
     is($n_rule_nat,1,"Expecting nat rule for $local_ip:$public_port "
                 ."-> ".$domain_ip.":$internal_port") or exit;
 
+    {
+    my @sql_rules = search_sql_iptables($local_ip, $remote_ip);
+    is(scalar(@sql_rules),4,"[$vm_name] Expecting 4 rules for"
+        ." $remote_ip -> $local_ip, got "
+        .scalar @sql_rules) or exit;
+    }
     #################################################################
     #
     # shutdown forced
-    eval { $domain->domain->destroy() };
+    eval { $domain->destroy() };
     is($@,'');
 
     ($n_rule) = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
@@ -266,23 +276,20 @@ sub test_crash_domain {
 
     {
     my @sql_rules = search_sql_iptables($local_ip, $remote_ip);
-    is(scalar(@sql_rules),2,"[$vm_name] Expecting 2 rules for"
+    is(scalar(@sql_rules),4,"[$vm_name] Expecting 4 rules for"
         ." $remote_ip -> $local_ip, got "
         .scalar @sql_rules) ;
     }
 
 
     my $domain2 = create_domain($vm_name, $USER,'debian');
-    my $remote_ip2 = '1.2.3.4';
-
-    $domain2->start(user => $USER, remote_ip => $remote_ip2)
-        if !$domain2->is_active();
+    $domain2->start(user => $USER) if !$domain2->is_active;
 
     {
     my @sql_rules = search_sql_iptables($local_ip, $remote_ip);
     is(scalar(@sql_rules),0,"[$vm_name] Expecting 0 rules for"
         ." $remote_ip -> $local_ip, got "
-        .scalar @sql_rules);
+        .scalar @sql_rules) or exit;
     }
 
     ($n_rule) = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
@@ -296,6 +303,7 @@ sub test_crash_domain {
     is($n_rule_nat,0,"[$vm_name] Expecting 0 rules for $remote_ip -> $local_ip:$public_port "
                     ." got $n_rule_nat ");
 
+    $domain2->remove($USER);
 }
 
 sub test_two_ports {
@@ -396,7 +404,8 @@ sub test_two_ports {
 
 sub _wait_ip {
     my $vm_name = shift;
-    my $domain = shift;
+    my $domain = shift  or die "Missing domain arg";
+
     return if $domain->_vm->type !~ /kvm|qemu/i;
     return $domain->ip  if $domain->ip;
 
@@ -599,18 +608,90 @@ sub test_host_down {
 
 }
 
+sub test_req_expose {
+    my $vm_name = shift;
+
+    my $domain = create_domain($vm_name, $USER,'debian');
+
+    my $remote_ip = '10.0.0.6';
+
+    $domain->start(user => $USER, remote_ip => $remote_ip);
+
+    _wait_ip($vm_name, $domain);
+
+    my $internal_port = 22;
+    my $req = Ravada::Request->expose(
+                   uid => $USER->id
+            ,port => $internal_port
+            ,id_domain => $domain->id
+    );
+    rvd_back->_process_all_requests_dont_fork();
+
+    is($req->status(),'done');
+    is($req->error(),'');
+
+    is(scalar $domain->list_ports,1) or exit;
+
+    my $vm = rvd_back->search_vm($vm_name);
+    my $local_ip = $vm->ip;
+    my $domain_ip = $domain->ip;
+
+    my ($public_ip, $public_port) = $domain->public_address($internal_port);
+    is($public_ip, $vm->ip);
+    ok($public_port);
+
+    my ($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+
+    is($n_rule,3,"[$vm_name] Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
+
+    my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+    is($n_rule_nat,1,"[$vm_name] Expecting nat rule for"
+                ." $local_ip:$public_port "
+                ."-> ".$domain_ip.":$internal_port")
+        or exit;
+
+    $domain->remove($USER);
+
+    my @sql_iptables = search_sql_iptables($public_ip, $remote_ip);
+    ok(!scalar @sql_iptables,"Expecting 0 iptables SQL , got ".Dumper(\@sql_iptables))
+        or exit;
+
+    is(scalar $domain->list_ports,0) or exit;
+
+    ($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+
+    is($n_rule,0, "[$vm_name] Expecting no rule for $remote_ip -> $local_ip:$public_port");
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+    is($n_rule_nat,0, "[$vm_name] Expecting no nat rule for "
+                ."$local_ip:$public_port "
+                ."-> ".$domain_ip.":$internal_port") ;
+
+}
+
 ##############################################################
 
 clean();
 
 add_network_10(0);
 
-for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
+for my $vm_name ( 'Void','KVM') {
 
     my $vm = rvd_back->search_vm($vm_name);
     next if !$vm;
 
     diag("Testing $vm_name");
+
+    flush_rules();
+    test_crash_domain($vm_name);
+
+    flush_rules();
+    test_req_expose($vm_name);
+
     flush_rules();
     test_no_ports($vm_name);
     test_one_port($vm_name);
@@ -620,6 +701,7 @@ for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
 
     flush_rules();
     test_two_ports($vm_name);
+
 }
 
 flush_rules();

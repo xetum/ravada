@@ -185,11 +185,15 @@ sub remove_old_domains {
 }
 
 ################################################################
+
+my $vm_name = 'LXC';
 eval { $vm_lxc = Ravada::VM::LXC->new() } if $CAN_LXC;
 SKIP: {
     my $msg = ($@ or "No LXC vitual manager found");
 
-    my $vm = $RAVADA->search_vm('lxc') if $RAVADA;
+    my $vm;
+    $vm = $RAVADA->search_vm($vm_name)
+        if $RAVADA && $CAN_LXC;
 
     if (!$vm_lxc) {
         ok(!$vm,"There should be no LXC backends");
