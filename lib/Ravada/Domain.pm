@@ -412,6 +412,29 @@ sub _data {
     return $self->{_data}->{$field};
 }
 
+=head2 open
+
+Open a domain
+
+Argument: id
+
+Returns: Domain object read only
+
+=cut
+
+sub open($class, $id) {
+    my $self = {};
+    bless $self,$class;
+
+    my $row = $self->_select_domain_db ( id => $id );
+
+    my $vm = { readonly => 1 };
+    my $vm_class = "Ravada::VM::".$row->{vm};
+    bless $vm, $vm_class;
+
+    return $vm->search_domain($row->{name});
+}
+
 =head2 is_known
 
 Returns if the domain is known in Ravada.
