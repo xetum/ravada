@@ -428,6 +428,12 @@ sub open($class, $id) {
 
     my $row = $self->_select_domain_db ( id => $id );
 
+    die "Domain id = $id not found"
+        if !keys %$row;
+
+    die "Domain ".$row->{name}." has no VM "
+        .Dumper($row)   if !$row->{vm};
+
     my $vm0 = {};
     my $vm_class = "Ravada::VM::".$row->{vm};
     bless $vm0, $vm_class;
@@ -1203,17 +1209,26 @@ sub _remove_iptables {
 # clean iptables left from down domains
 
 sub _clean_iptables {
-    my $self = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
         "SELECT id,id_domain,iptables FROM iptables "
         ."    WHERE time_deleted IS NULL"
     );
+    my $sth_delete = $$CONNECTOR->dbh->prepare(
+        "DELETE FROM iptables WHERE id=?"
+    );
+
     my ( $id, $id_domain, $iptables);
-    $sth->bind_columns(\( $id, $id_domain, $iptables));
     $sth->execute;
+    $sth->bind_columns(\( $id, $id_domain, $iptables));
     while ($sth->fetch) {
-        my $domain = Ravada::Domain->open($id_domain);
+        my $domain;
+        eval { $domain = Ravada::Domain->open($id_domain) };
+        warn $@ if $@ && $@ !~ /Domain.*not found/i;
+        if (!$domain) {
+            $sth_delete->execute($id);
+            next;
+        }
         next if $domain->is_active;
         $domain->_remove_iptables();
     }
