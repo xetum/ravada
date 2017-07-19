@@ -1048,7 +1048,10 @@ sub expose($self, $user, $internal_port, $name=undef) {
     );
 
     my $internal_ip;
-    $internal_ip = $self->ip if $self->is_active;
+    if ($self->is_active) {
+        $internal_ip = $self->ip
+            or warn "No internal IP for domain ".$self->name;
+    }
     my $public_ip = $self->_vm->ip;
     my $public_port = $self->_new_free_port();
 
@@ -1065,7 +1068,7 @@ sub expose($self, $user, $internal_port, $name=undef) {
         , $public_ip, $internal_ip, ($name or undef));
     $sth->finish;
 
-    if ($self->is_active) {
+    if ($internal_ip) {
         my $remote_ip = $self->remote_ip();
         $self->_add_iptable($user, $remote_ip, $public_ip, $public_port);
         $self->_add_iptable_nat($user, $public_ip, $public_port, $internal_ip, $internal_port);
@@ -1281,6 +1284,8 @@ sub _add_iptable($self, $user, $remote_ip, $local_ip, $local_port) {
 }
 
 sub _add_iptable_nat($self,$user, $public_ip, $public_port, $internal_ip, $internal_port) {
+    confess "Undefined internal_ip (arg 4)"
+        if !defined $internal_ip;
     my $filter = 'nat';
     my $chain = 'PREROUTING';
     my $ipt_obj = _obj_iptables();
@@ -1581,15 +1586,29 @@ sub _remote_data {
     my $self = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
-        "SELECT remote_ip, id_user FROM iptables "
+        "SELECT * FROM iptables "
         ." WHERE "
         ."    id_domain=?"
         ."    AND time_deleted IS NULL"
         ." ORDER BY time_req DESC "
     );
     $sth->execute($self->id);
-    return $sth->fetchrow();
+    my @rows;
+    while (my $row = $sth->fetchrow_hashref) {
+        my $iptables = decode_json($row->{iptables});
+        next if $iptables->[3] ne 'RAVADA'
+                || $iptables->[4] ne 'ACCEPT';
 
+        next if scalar@rows
+            && $row->{id_user} == $rows[0]->{id_user}
+            && $row->{remote_ip} eq $rows[0]->{remote_ip};
+
+        push @rows,($row);
+    }
+    die "Too many active tables for this domain"
+        .Dumper(\@rows)  if scalar @rows>1;
+    return $rows[0]->{remote_ip}
+            , $rows[0]->{id_user}
 }
 
 =head2 remote_ip
