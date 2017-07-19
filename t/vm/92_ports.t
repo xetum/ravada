@@ -681,7 +681,7 @@ add_network_10(0);
 
 for my $vm_name ( 'Void','KVM') {
 
-    my $vm = rvd_back->search_vm($vm_name);
+    my $vm = rvd_back->search_vm($vm_name)  if rvd_back->valid_vm($vm_name);
     next if !$vm;
 
     diag("Testing $vm_name");
