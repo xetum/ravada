@@ -1682,6 +1682,17 @@ sub _cmd_expose {
 
 }
 
+sub _cmd_remove_expose {
+    my ($self, $request) = @_;
+    my $uid = $request->args('uid');
+
+    my $user = Ravada::Auth::SQL->search_by_id( $uid);
+    my $domain = $self->search_domain_by_id($request->args('id_domain'));
+
+    $domain->remove_expose($user, $request->args('port'));
+
+}
+
 sub _cmd_list_vm_types {
     my $self = shift;
     my $request = shift;
@@ -1757,6 +1768,7 @@ sub _req_method {
  ,rename_domain => \&_cmd_rename_domain
  ,open_iptables => \&_cmd_open_iptables
  ,list_vm_types => \&_cmd_list_vm_types
+ ,remove_expose => \&_cmd_remove_expose
 ,force_shutdown => \&_cmd_force_shutdown
 
     );

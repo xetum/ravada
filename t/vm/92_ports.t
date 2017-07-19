@@ -1,6 +1,7 @@
 use warnings;
 use strict;
 
+use Carp qw(confess);
 use Data::Dumper;
 use JSON::XS;
 use Test::More;
@@ -125,6 +126,7 @@ sub test_one_port {
 # Remove expose port
 sub test_remove_expose {
     my $vm_name = shift;
+    my $request = shift;
 
     my $vm = rvd_back->search_vm($vm_name);
 
@@ -141,7 +143,7 @@ sub test_remove_expose {
     my $client_user = $domain->remote_user();
     is($client_user->id, $USER->id);
 
-    _wait_ip($domain);
+    _wait_ip($vm_name, $domain);
 
     my $domain_ip = $domain->ip;
     ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
@@ -168,9 +170,22 @@ sub test_remove_expose {
     #################################################################
     #
     # remove expose
-    local $@ = undef;
-    eval { $domain->remove_expose($USER,$internal_port) };
-    is($@, '');
+    if (!$request) {
+        local $@ = undef;
+        eval { $domain->remove_expose($USER,$internal_port) };
+        is($@, '');
+    } else {
+        my $req = Ravada::Request->remove_expose(
+                   uid => $USER->id
+                 ,port => $internal_port
+            ,id_domain => $domain->id
+        );
+        rvd_back->_process_all_requests_dont_fork();
+
+        is($req->status(),'done');
+        is($req->error(),'');
+    }
+    is(scalar $domain->list_ports,0) or exit;
 
     ($n_rule) = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
     is($n_rule,0,"[$vm_name] Expecting 0 rules for "
@@ -198,6 +213,10 @@ sub test_remove_expose {
         .scalar @sql_rules." ".Dumper(\@sql_rules)) or exit;
     }
 
+}
+
+sub test_req_remove_expose {
+    test_remove_expose(@_,'request');
 }
 
 # Remove crash a domain and see if ports are closed after cleanup
@@ -229,8 +248,10 @@ sub test_crash_domain {
 
     _wait_ip($vm_name, $domain);
 
-    my $domain_ip = $domain->ip;
-    ok($domain_ip,"[$vm_name] Expecting an IP for domain ".$domain->name.", got ".($domain_ip or '')) or return;
+    my $domain_ip = $domain->ip or do {
+        diag("[$vm_name] Expecting an IP for domain ".$domain->name);
+        return;
+    };
 
     my $internal_port = 22;
     my ($public_ip0, $public_port0) = $domain->expose($USER,$internal_port);
@@ -404,7 +425,7 @@ sub test_two_ports {
 
 sub _wait_ip {
     my $vm_name = shift;
-    my $domain = shift  or die "Missing domain arg";
+    my $domain = shift  or confess "Missing domain arg";
 
     return if $domain->_vm->type !~ /kvm|qemu/i;
     return $domain->ip  if $domain->ip;
@@ -415,11 +436,11 @@ sub _wait_ip {
 
     return if $@;
     sleep 2;
-    for ( 1 .. 6 ) {
+    for ( 1 .. 12 ) {
         diag("sending enter to ".$domain->name);
         eval ' $domain->domain->send_key(Sys::Virt::Domain::KEYCODE_SET_LINUX,200, [28]) ';
         die $@ if $@;
-        sleep 1;
+        sleep 2;
     }
     for (1 .. 30) {
         last if $domain->ip;
@@ -685,6 +706,9 @@ for my $vm_name ( 'Void','KVM') {
     next if !$vm;
 
     diag("Testing $vm_name");
+
+    flush_rules();
+    test_req_remove_expose($vm_name);
 
     flush_rules();
     test_crash_domain($vm_name);
