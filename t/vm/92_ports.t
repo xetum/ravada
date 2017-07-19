@@ -18,11 +18,6 @@ my $FILE_CONFIG = 't/etc/ravada.conf';
 
 my @ARG_RVD = ( config => $FILE_CONFIG,  connector => $test->connector);
 
-my %ARG_CREATE_DOM = (
-      KVM => [ id_iso => 1 ]
-    ,Void => [ ]
-);
-
 my $RVD_BACK = rvd_back($test->connector, $FILE_CONFIG);
 my $USER = create_user("foo","bar");
 
@@ -603,11 +598,13 @@ sub test_host_down {
 sub test_req_expose {
     my $vm_name = shift;
 
-    my $domain = create_domain($vm_name, $USER);
+    my $domain = create_domain($vm_name, $USER,'debian');
 
-    my $remote_ip = '10.4.5.6';
+    my $remote_ip = '10.0.0.6';
 
     $domain->start(user => $USER, remote_ip => $remote_ip);
+
+    _wait_ip($vm_name, $domain);
 
     my $internal_port = 22;
     my $req = Ravada::Request->expose(
@@ -623,10 +620,24 @@ sub test_req_expose {
     is(scalar $domain->list_ports,1) or exit;
 
     my $vm = rvd_back->search_vm($vm_name);
+    my $local_ip = $vm->ip;
+    my $domain_ip = $domain->ip;
 
     my ($public_ip, $public_port) = $domain->public_address($internal_port);
     is($public_ip, $vm->ip);
     ok($public_port);
+
+    my ($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+
+    is($n_rule,3,"[$vm_name] Expecting rule for $remote_ip -> $local_ip:$public_port") or exit;
+
+    my ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+    is($n_rule_nat,1,"[$vm_name] Expecting nat rule for"
+                ." $local_ip:$public_port "
+                ."-> ".$domain_ip.":$internal_port")
+        or exit;
 
     $domain->remove($USER);
 
@@ -635,6 +646,18 @@ sub test_req_expose {
         or exit;
 
     is(scalar $domain->list_ports,0) or exit;
+
+    ($n_rule)
+        = search_iptables_rule_ravada($local_ip, $remote_ip, $public_port);
+
+    is($n_rule,0, "[$vm_name] Expecting no rule for $remote_ip -> $local_ip:$public_port");
+
+    ($n_rule_nat) = search_iptables_rule_nat($local_ip, $public_port
+                        , $domain_ip, $internal_port);
+    is($n_rule_nat,0, "[$vm_name] Expecting no nat rule for "
+                ."$local_ip:$public_port "
+                ."-> ".$domain_ip.":$internal_port") ;
+
 }
 
 ##############################################################
@@ -643,13 +666,17 @@ clean();
 
 add_network_10(0);
 
-for my $vm_name ( sort keys %ARG_CREATE_DOM ) {
+for my $vm_name ( 'Void','KVM') {
 
     my $vm = rvd_back->search_vm($vm_name);
     next if !$vm;
 
     diag("Testing $vm_name");
 
+    flush_rules();
+    test_crash_domain();
+
+    flush_rules();
     test_req_expose($vm_name);
 
     flush_rules();
