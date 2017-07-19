@@ -1581,4 +1581,17 @@ sub pre_remove {
     $self->domain->managed_save_remove if $self->domain->has_managed_save_image;
 }
 
+=head2 destroy
+
+Immediately poweroff the machine using the internal shutdown method and
+without triggering the post shutdown actions. It should be used only as
+a last resort or test purposes
+
+=cut
+
+sub destroy {
+    my $self = shift;
+    $self->domain->destroy();
+}
+
 1;

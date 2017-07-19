@@ -422,4 +422,9 @@ sub clean_swap_volumes {
 }
 
 sub hybernate { confess "Not supported"; }
+
+sub destroy {
+    my $self = shift;
+    $self->_store('is_active',0);   
+}
 1;
