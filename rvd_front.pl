@@ -1303,7 +1303,16 @@ sub remove_expose {
     for my $param_name (grep /^remove_expose_\d+$/
             ,(@{$c->req->params->names})) {
         my ($port) = $param_name =~ m{(\d+)};
-        my $req = Ravada::Request->remove_expose(user => $USER, port => $port);
+        my $req = Ravada::Request->remove_expose(
+                   uid => $USER->id
+                , port => $port
+            ,id_domain => $domain->id
+        );
+        for ( 1 .. 3 ) {
+            last if $req->status eq 'done';
+            sleep 1;
+        }
+        $c->redirect_to( $c->req->url->to_abs->path);
     }
 }
 
