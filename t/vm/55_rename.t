@@ -198,7 +198,7 @@ sub test_rename_twice {
 remove_old_domains();
 remove_old_disks();
 
-for my $vm_name (qw( Void KVM )) {
+for my $vm_name ('Void', rvd_back->valid_vms() ) {
 
     my $vm_ok;
     eval {

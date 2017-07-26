@@ -48,7 +48,7 @@ sub test_spice {
 clean();
 
 my $vm_name = 'KVM';
-my $vm = rvd_back->search_vm($vm_name);
+my $vm = rvd_back->search_vm($vm_name)  if rvd_back->valid_vm($vm_name);
 
 
 SKIP: {

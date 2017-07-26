@@ -42,7 +42,6 @@ has 'fork' => (
 
 our $CONNECTOR;# = \$Ravada::CONNECTOR;
 our $TIMEOUT = 20;
-our @VM_TYPES = ('KVM');
 our $DIR_SCREENSHOTS = "/var/www/img/screenshots";
 
 our %VM;
@@ -271,7 +270,7 @@ sub list_vm_types {
 
     return $self->{cache}->{vm_types} if $self->{cache}->{vm_types};
 
-    my $result = [@VM_TYPES];
+    my $result = [Ravada::valid_vms()];
 
     $self->{cache}->{vm_types} = $result if $result->[0];
 

@@ -159,7 +159,7 @@ remove_old_domains();
 remove_old_disks();
 
 for my $vm_name (@VMS) {
-    my $vm = $RVD_BACK->search_vm($vm_name);
+    my $vm = $RVD_BACK->search_vm($vm_name) if rvd_back->valid_vm($vm_name);
     SKIP : {
         my $msg = "SKIPPED test: No $vm_name VM found ";
         diag($msg)      if !$vm;

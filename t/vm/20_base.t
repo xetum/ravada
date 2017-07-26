@@ -51,7 +51,6 @@ sub test_create_domain {
                     , id_owner => $USER->id
                     , @{$ARG_CREATE_DOM{$vm_name}})
     };
-
     ok($domain,"No domain $name created with ".ref($vm)." ".($@ or '')) or exit;
     ok($domain->name
         && $domain->name eq $name,"Expecting domain name '$name' , got "
@@ -116,6 +115,17 @@ sub test_prepare_base {
     ok(!$@, $@);
     ok($domain->is_base);
     is($domain->is_active(),0);
+
+    my $front_domains = rvd_front->list_domains();
+    my ($dom_front) = grep { $_->{name} eq $domain->name }
+        @$front_domains;
+
+    ok($dom_front,"Expecting the domain ".$domain->name
+                    ." in list domains");
+
+    if ($dom_front) {
+        ok($dom_front->{is_base});
+    }
 
     eval { $domain->prepare_base( $USER) };
     ok($@ && $@ =~ /already/i,"[$vm_name] Don't prepare if already "

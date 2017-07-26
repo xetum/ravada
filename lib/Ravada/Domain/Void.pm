@@ -19,12 +19,6 @@ has 'domain' => (
     ,required => 1
 );
 
-has '_ip' => (
-    is => 'rw'
-    ,isa => 'Str'
-    ,default => sub { return '1.1.1.'.int rand(255)}
-);
-
 our $DIR_TMP = "/var/tmp/rvd_void";
 
 #######################################3
@@ -348,6 +342,7 @@ sub _set_default_info {
             ,cpu_time => 1
             ,n_virt_cpu => 1
             ,state => 'UNKNOWN'
+            ,ip => ($$ % 256).".1.1.".int(rand(254)+1)
     };
     $self->_store(info => $info);
 
@@ -414,7 +409,7 @@ sub spinoff_volumes {
 
 sub ip {
     my $self = shift;
-    return $self->_ip;
+    return $self->get_info->{ip};
 }
 
 sub clean_swap_volumes {
@@ -427,4 +422,9 @@ sub clean_swap_volumes {
 }
 
 sub hybernate { confess "Not supported"; }
+
+sub destroy {
+    my $self = shift;
+    $self->_store('is_active',0);   
+}
 1;

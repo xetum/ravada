@@ -44,7 +44,7 @@ my $CONFIG_FRONT = plugin Config => { default => {
                                                 pid_file => 'log/rvd_front.pid'
                                                 ,listen => ['http://*:8081']
                                                 }
-                                              ,login_bg_file => '../img/intro-bg.jpg'
+                                              ,login_bg_file => '/img/intro-bg.jpg'
                                               ,login_header => 'Welcome'
                                               ,login_message => ''
                                               ,secrets => ['changeme0']
@@ -1128,9 +1128,12 @@ sub show_link {
     _open_iptables($c,$domain)
         if !$req;
     my $uri_file = "/machine/display/".$domain->id;
-    $c->stash(url => $uri_file)  if $c->session('auto_start');
+
+    $c->stash(url => $uri_file)
+        if $c->session('auto_start') && !$domain->spice_password;
+
     my ($display_ip, $display_port) = $uri =~ m{\w+://(\d+\.\d+\.\d+\.\d+):(\d+)};
-    my $description = $domain->get_description;
+    my $description = $domain->description;
     $c->stash(description => $description);
     $c->render(template => 'main/run'
                 ,name => $domain->name
@@ -1139,7 +1142,7 @@ sub show_link {
                 ,url_display_file => $uri_file
                 ,display_ip => $display_ip
                 ,display_port => $display_port
-                ,description => $description
+                ,description => $domain->description
                 ,login => $c->session('login'));
 }
 
@@ -1300,7 +1303,16 @@ sub remove_expose {
     for my $param_name (grep /^remove_expose_\d+$/
             ,(@{$c->req->params->names})) {
         my ($port) = $param_name =~ m{(\d+)};
-        $domain->remove_expose($USER,$port);
+        my $req = Ravada::Request->remove_expose(
+                   uid => $USER->id
+                , port => $port
+            ,id_domain => $domain->id
+        );
+        for ( 1 .. 3 ) {
+            last if $req->status eq 'done';
+            sleep 1;
+        }
+        $c->redirect_to( $c->req->url->to_abs->path);
     }
 }
 
@@ -1367,13 +1379,13 @@ sub settings_machine {
     }
 
     $c->stash(description => '');
-    my $description = $domain->get_description;
+    my $description = $domain->description;
     $c->stash(description => $description);
 
     if ( $c->param("description") ) {
         $domain->description($c->param("description"));
         $c->stash(message => 'Description applied!');
-        my $description = $domain->get_description;
+        my $description = $domain->description;
         $c->stash(description => $description);
     }
 
