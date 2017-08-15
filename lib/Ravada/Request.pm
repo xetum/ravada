@@ -60,6 +60,8 @@ our %VALID_ARG = (
     ,set_driver => {uid => 1, id_domain => 1, id_option => 1}
     ,hybernate=> {uid => 1, id_domain => 1}
     ,download => {uid => 2, id_iso => 1, id_vm => 2, delay => 2}
+    ,expose => { uid => 1, id_domain => 1, port => 1, name => 2, description => 2}
+    ,remove_expose => { uid => 1, id_domain => 1, port => 1 }
 );
 
 our %CMD_SEND_MESSAGE = map { $_ => 1 }
@@ -260,7 +262,11 @@ sub _check_args {
     }
 
     for (keys %{$VALID_ARG{$sub}}) {
-        next if $VALID_ARG{$sub}->{$_} == 2; # optional arg
+        # optional arg
+        if ( $VALID_ARG{$sub}->{$_} == 2) { 
+            $args->{$_} = undef if !exists $args->{$_};
+            next;
+        }
         confess "Missing argument $_"   if !exists $args->{$_};
     }
 
@@ -802,6 +808,50 @@ sub download {
 
     return $self->_new_request(
             command => 'download'
+             , args => encode_json($args)
+    );
+
+}
+
+=head2 expose
+
+Expose a port from a domain.
+
+=cut
+
+sub expose {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+
+    my $args = _check_args('expose', @_ );
+
+    my $self = {};
+    bless($self,$class);
+
+    return $self->_new_request(
+            command => 'expose'
+             , args => encode_json($args)
+    );
+
+}
+
+=head2 remove_expose
+
+Remove an exposed port from a domain.
+
+=cut
+
+sub remove_expose {
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+
+    my $args = _check_args('remove_expose', @_ );
+
+    my $self = {};
+    bless($self,$class);
+
+    return $self->_new_request(
+            command => 'remove_expose'
              , args => encode_json($args)
     );
 

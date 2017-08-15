@@ -54,7 +54,7 @@ sub test_wrong_args {
     my ($vm_name, $vm) = @_;
 
     eval { $RVD_BACK->import_domain( vm => 'nonvm', user => $USER->name, name => 'a') };
-    like($@,qr/unknown VM/i);
+    like($@,qr/invalid VM/i);
 
     eval { $RVD_BACK->import_domain( vm => $vm_name,user => 'nobody', name => 'a') };
     like($@,qr/unknown user/i);
@@ -159,7 +159,7 @@ remove_old_domains();
 remove_old_disks();
 
 for my $vm_name (@VMS) {
-    my $vm = $RVD_BACK->search_vm($vm_name);
+    my $vm = $RVD_BACK->search_vm($vm_name) if rvd_back->valid_vm($vm_name);
     SKIP : {
         my $msg = "SKIPPED test: No $vm_name VM found ";
         diag($msg)      if !$vm;

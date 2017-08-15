@@ -147,7 +147,7 @@ SKIP: {
 
     my $msg = ($@ or "No LXC vitual manager found");
 
-    my $vm = $RAVADA->search_vm('lxc');
+    my $vm = $RAVADA->search_vm('LXC') if $vm_lxc;
 
     if (!$vm_lxc) {
         ok(!$vm,"There should be no LXC backends");

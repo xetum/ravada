@@ -12,8 +12,6 @@ use lib 't/lib';
 use Test::Ravada;
 use Sys::Statistics::Linux;
 
-my $BACKEND = 'KVM';
-
 use_ok('Ravada');
 
 my $test = Test::SQL::Data->new( config => 't/etc/sql.conf');
@@ -78,13 +76,15 @@ my $vm;
 remove_old_domains();
 remove_old_disks();
 
+for my $vm_name (rvd_back->valid_vms) {
+    next if $vm_name eq 'Void';
 SKIP: {
-    my $msg = "SKIPPED test: No KVM backend found";
-    my $vm = $RVD_BACK->search_vm('KVM');
+    my $msg = "SKIPPED test: No $vm_name backend found";
+    my $vm = $RVD_BACK->search_vm($vm_name);
     diag($msg)      if !$vm;
     skip $msg,10    if !$vm;
 
-    use_ok("Ravada::Domain::$BACKEND");
+    use_ok("Ravada::Domain::$vm_name");
 
     my $freemem = _check_free_memory();
     my $n_domains = int($freemem)+2;
@@ -114,7 +114,7 @@ SKIP: {
         $_->remove($USER);
     }
 };
-
+}
 remove_old_domains();
 remove_old_disks();
 

@@ -137,7 +137,7 @@ before 'remove' => \&_pre_remove_domain;
 before 'prepare_base' => \&_pre_prepare_base;
  after 'prepare_base' => \&_post_prepare_base;
 
-before 'start' => \&_start_preconditions;
+before 'start' => \&_pre_start;
  after 'start' => \&_post_start;
 
 before 'pause' => \&_allow_manage;
@@ -164,6 +164,12 @@ after 'rename' => \&_post_rename;
 
 after 'screenshot' => \&_post_screenshot;
 ##################################################
+#
+
+sub BUILD {
+    my $self = shift;
+    $self->is_known();
+}
 
 sub _vm_connect {
     my $self = shift;
@@ -175,7 +181,7 @@ sub _vm_disconnect {
     $self->_vm->disconnect();
 }
 
-sub _start_preconditions{
+sub _pre_start {
     my ($self) = @_;
 
     if (scalar @_ %2 ) {
@@ -183,6 +189,7 @@ sub _start_preconditions{
     } else {
         _allow_manage(@_);
     }
+    _clean_iptables();
     _check_free_memory();
     _check_used_memory(@_);
 
@@ -191,11 +198,16 @@ sub _start_preconditions{
 sub _update_description {
     my $self = shift;
 
+    return if defined $self->description
+        && defined $self->_data('description')
+        && $self->description eq $self->_data('description');
+
     my $sth = $$CONNECTOR->dbh->prepare(
         "UPDATE domains SET description=? "
-        ." WHERE id=?");
+        ." WHERE id=? ");
     $sth->execute($self->description,$self->id);
     $sth->finish;
+    $self->{_data}->{description} = $self->{description};
 }
 
 sub _allow_manage_args {
@@ -400,17 +412,35 @@ sub _data {
     return $self->{_data}->{$field};
 }
 
-sub __open {
-    my $self = shift;
+=head2 open
 
-    my %args = @_;
+Open a domain
 
-    my $id = $args{id} or confess "Missing required argument id";
-    delete $args{id};
+Argument: id
 
-    my $row = $self->_select_domain_db ( );
-    return $self->search_domain($row->{name});
-#    confess $row;
+Returns: Domain object read only
+
+=cut
+
+sub open($class, $id) {
+    my $self = {};
+    bless $self,$class;
+
+    my $row = $self->_select_domain_db ( id => $id );
+
+    die "Domain id = $id not found"
+        if !keys %$row;
+
+    die "Domain ".$row->{name}." has no VM "
+        .Dumper($row)   if !$row->{vm};
+
+    my $vm0 = {};
+    my $vm_class = "Ravada::VM::".$row->{vm};
+    bless $vm0, $vm_class;
+
+    my $vm = $vm0->new( readonly => 1);
+
+    return $vm->search_domain($row->{name});
 }
 
 =head2 is_known
@@ -448,6 +478,7 @@ sub _select_domain_db {
     $sth->finish;
 
     $self->{_data} = $row;
+    $self->description($row->{description}) if defined $row->{description};
     return $row if $row->{id};
 }
 
@@ -531,7 +562,7 @@ sub _display_file_spice($self,$user) {
     } else {
         $ret .= "port=$port\n";
     }
-    $ret .="password=%s\n"  if $self->spice_password();
+#    $ret .="password=%s\n"  if $self->spice_password();
 
     $ret .=
         "fullscreen=1\n"
@@ -579,7 +610,7 @@ sub _insert_db {
     eval { $sth->execute( map { $field{$_} } sort keys %field ) };
     if ($@) {
         #warn "$query\n".Dumper(\%field);
-        die $@;
+        confess $@;
     }
     $sth->finish;
 
@@ -612,8 +643,17 @@ sub _after_remove_domain {
         $self->_remove_files_base();
     }
     return if !$self->{_data};
+    $self->_remove_ports_db();
     $self->_remove_base_db();
     $self->_remove_domain_db();
+}
+
+sub _remove_ports_db {
+    my $self = shift;
+
+    my $sth = $$CONNECTOR->dbh->prepare("DELETE FROM domain_ports where id_domain=?");
+    $sth->execute($self->id);
+    $sth->finish;
 }
 
 sub _remove_domain_db {
@@ -906,20 +946,21 @@ sub clone {
 
     my $id_base = $self->id;
 
-    return $self->_vm->create_domain(
+    my $clone = $self->_vm->create_domain(
         name => $name
         ,id_base => $id_base
         ,id_owner => $uid
         ,vm => $self->vm
         ,_vm => $self->_vm
     );
+    $clone->description($self->description) if defined $self->description;
+    return $clone;
 }
 
 sub _post_pause {
     my $self = shift;
-    my $user = shift;
 
-    $self->_remove_iptables(user => $user);
+    $self->_remove_iptables();
 }
 
 sub _pre_shutdown {
@@ -943,7 +984,7 @@ sub _post_shutdown {
     my $user = delete $arg{user};
 
     $self->_remove_temporary_machine(@_);
-    $self->_remove_iptables(user => $user) if $self->is_known();
+    $self->_remove_iptables() if $self->is_known();
     $self->clean_swap_volumes(user => $user)
         if $self->is_known && $self->id_base() && !$self->is_active;
 
@@ -1004,7 +1045,10 @@ sub add_volume_swap {
 
 Expose a TCP port from the domain
 
-Arguments: number of the port
+Arguments: 
+ - user
+ - number of the port
+ - optional name
 
 Returns: public ip and port
 
@@ -1012,9 +1056,8 @@ Returns: public ip and port
 
 sub expose($self, $user, $internal_port, $name=undef) {
 
-    _init_connector();
-
-    $self->_allow_manage($user);
+    die "User ".$user->name." [".$user->id."] not allowed.\n"
+        if $self->id_owner != $user->id && !$user->is_admin;
 
     my $sth = $$CONNECTOR->dbh->prepare(
         "INSERT INTO domain_ports (id_domain"
@@ -1026,7 +1069,10 @@ sub expose($self, $user, $internal_port, $name=undef) {
     );
 
     my $internal_ip;
-    $internal_ip = $self->ip if $self->is_active;
+    if ($self->is_active) {
+        $internal_ip = $self->ip
+            or warn "No internal IP for domain ".$self->name;
+    }
     my $public_ip = $self->_vm->ip;
     my $public_port = $self->_new_free_port();
 
@@ -1043,7 +1089,7 @@ sub expose($self, $user, $internal_port, $name=undef) {
         , $public_ip, $internal_ip, ($name or undef));
     $sth->finish;
 
-    if ($self->is_active) {
+    if ($internal_ip) {
         my $remote_ip = $self->remote_ip();
         $self->_add_iptable($user, $remote_ip, $public_ip, $public_port);
         $self->_add_iptable_nat($user, $public_ip, $public_port, $internal_ip, $internal_port);
@@ -1051,12 +1097,23 @@ sub expose($self, $user, $internal_port, $name=undef) {
     return($public_ip, $public_port);
 }
 
+=head2 remove_expose
+
+Remove a exposed TCP port from the domain
+
+Arguments:
+
+ - number of the port
+ - user
+
+=cut
+
 sub remove_expose($self, $user, $internal_port) {
-    $self->_init_connector();
+
     $self->_allow_manage($user);
 
     my ($public_ip, $public_port) = $self->public_address($internal_port);
-    $self->_remove_iptables(user => $user, d_port => $public_port)
+    $self->_remove_iptables(d_port => $public_port)
         if $public_port;
 
     my $sth = $$CONNECTOR->dbh->prepare(
@@ -1122,10 +1179,8 @@ sub client_ip($self) {
 
 sub _remove_iptables {
     my $self = shift;
-
     my %args = @_;
 
-    my $user = delete $args{user} or croak "ERROR: missing user";
     my $d_port = delete $args{d_port};
     croak "Unknown params:". join(", ", keys %args) if %args;
 
@@ -1135,7 +1190,7 @@ sub _remove_iptables {
         "UPDATE iptables SET time_deleted=?"
         ." WHERE id=?"
     );
-    for my $row ($self->_active_iptables($user)) {
+    for my $row ($self->_active_iptables()) {
         my ($id, $iptables) = @$row;
         if ($d_port) {
 #            warn "$d_port\n".Dumper($iptables)."\n";
@@ -1149,6 +1204,35 @@ sub _remove_iptables {
 #        }
         $sth->execute(Ravada::Utils::now(), $id);
     }
+}
+
+# clean iptables left from down domains
+
+sub _clean_iptables {
+
+    my $sth = $$CONNECTOR->dbh->prepare(
+        "SELECT id,id_domain,iptables FROM iptables "
+        ."    WHERE time_deleted IS NULL"
+    );
+    my $sth_delete = $$CONNECTOR->dbh->prepare(
+        "DELETE FROM iptables WHERE id=?"
+    );
+
+    my ( $id, $id_domain, $iptables);
+    $sth->execute;
+    $sth->bind_columns(\( $id, $id_domain, $iptables));
+    while ($sth->fetch) {
+        my $domain;
+        eval { $domain = Ravada::Domain->open($id_domain) };
+        warn $@ if $@ && $@ !~ /Domain.*not found/i;
+        if (!$domain) {
+            $sth_delete->execute($id);
+            next;
+        }
+        next if $domain->is_active;
+        $domain->_remove_iptables();
+    }
+    $sth->finish;
 }
 
 sub _remove_temporary_machine {
@@ -1259,6 +1343,8 @@ sub _add_iptable($self, $user, $remote_ip, $local_ip, $local_port) {
 }
 
 sub _add_iptable_nat($self,$user, $public_ip, $public_port, $internal_ip, $internal_port) {
+    confess "Undefined internal_ip (arg 4)"
+        if !defined $internal_ip;
     my $filter = 'nat';
     my $chain = 'PREROUTING';
     my $ipt_obj = _obj_iptables();
@@ -1373,21 +1459,16 @@ sub _log_iptable {
 
 }
 
-sub _active_iptables {
-    my $self = shift;
-    my $user = shift;
-
-    confess "Missing \$user" if !$user;
+sub _active_iptables($self) {
 
     my $sth = $$CONNECTOR->dbh->prepare(
         "SELECT id,iptables FROM iptables "
         ." WHERE "
         ."    id_domain=?"
-        ."    AND id_user=? "
         ."    AND time_deleted IS NULL"
         ." ORDER BY time_req DESC "
     );
-    $sth->execute($self->id, $user->id);
+    $sth->execute($self->id);
     my @iptables;
     while (my ($id, $iptables) = $sth->fetchrow) {
         push @iptables, [ $id, decode_json($iptables)];
@@ -1559,15 +1640,29 @@ sub _remote_data {
     my $self = shift;
 
     my $sth = $$CONNECTOR->dbh->prepare(
-        "SELECT remote_ip, id_user FROM iptables "
+        "SELECT * FROM iptables "
         ." WHERE "
         ."    id_domain=?"
         ."    AND time_deleted IS NULL"
         ." ORDER BY time_req DESC "
     );
     $sth->execute($self->id);
-    return $sth->fetchrow();
+    my @rows;
+    while (my $row = $sth->fetchrow_hashref) {
+        my $iptables = decode_json($row->{iptables});
+        next if $iptables->[3] ne 'RAVADA'
+                || $iptables->[4] ne 'ACCEPT';
 
+        next if scalar@rows
+            && $row->{id_user} == $rows[0]->{id_user}
+            && $row->{remote_ip} eq $rows[0]->{remote_ip};
+
+        push @rows,($row);
+    }
+    die "Too many active tables for this domain"
+        .Dumper(\@rows)  if scalar @rows>1;
+    return $rows[0]->{remote_ip}
+            , $rows[0]->{id_user}
 }
 
 =head2 remote_ip
@@ -1608,19 +1703,6 @@ sub _new_free_port {
     }
     return $free_port;
 
-}
-
-sub get_description {
-    my $self = shift;
-
-    my $sth = $$CONNECTOR->dbh->prepare(
-        "SELECT description FROM domains "
-        ." WHERE name=?"
-    );
-    $sth->execute($self->name);
-    my ($description) = $sth->fetchrow();
-    $sth->finish;
-    return ($description or undef);
 }
 
 sub _dbh {

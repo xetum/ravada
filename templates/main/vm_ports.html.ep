@@ -21,7 +21,7 @@
             <div class="col-lg-5"><%= $port->{name} %></div>
             <div class="col-lg-4">
                 <input type="submit"
-                    name="remove_expose_<%= $domain->id %>"
+                    name="remove_expose_<%= $port->{internal_port} %>"
                     value="Remove">
                 <input type="submit" name="edit" value="Edit">
             </div>

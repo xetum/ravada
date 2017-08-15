@@ -156,7 +156,7 @@ sub test_vm_ro {
 remove_old_domains();
 remove_old_disks();
 
-for my $vm_name (qw(Void KVM)) {
+for my $vm_name (rvd_back->valid_vms()) {
     my $vm = $RVD_BACK->search_vm($vm_name);
     if ( !$vm ) {
         diag("Skipping VM $vm_name in this system");

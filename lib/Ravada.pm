@@ -3,7 +3,7 @@ package Ravada;
 use warnings;
 use strict;
 
-our $VERSION = '0.2.9-alpha';
+our $VERSION = '0.2.9-beta';
 
 use Carp qw(carp croak);
 use Data::Dumper;
@@ -30,6 +30,8 @@ eval {
     };
     $VALID_VM{KVM} = 1;
 };
+
+$VALID_VM{Void} = 1 if $0 =~ /\.t$/;
 
 no warnings "experimental::signatures";
 use feature qw(signatures);
@@ -226,12 +228,19 @@ sub _update_isos {
             ,xml_volume => 'yakkety64-volume.xml'
         }
         ,debian_stretch => {
-            name =>'Debian Stretch 64 bits XFCE'
-            ,description => 'Debian 9.0 Stretch 64 bits'
+            name =>'Debian Stretch 64 bits'
+            ,description => 'Debian 9.0 Stretch 64 bits (XFCE desktop)'
             ,url => 'https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-9.0.0-amd64-xfce-CD-1.iso'
             ,md5 => '9346436c0cf1862af71cb0a03d9a703c'
             ,xml => 'jessie-amd64.xml'
             ,xml_volume => 'jessie-volume.xml'
+        }
+        ,windows_7 => {
+          name => 'Windows 7'
+          ,description => 'Windows 7 64 bits. Requires an user provided ISO image.'
+            .'<a target="_blank" href="http://ravada.readthedocs.io/en/latest/docs/new_iso_image.html">[help]</a>'
+          ,xml => 'windows_7.xml'
+          ,xml_volume => 'windows10-volume.xml'
         }
     );
 
@@ -488,6 +497,24 @@ sub _upgrade_table {
     warn "INFO: adding $field $definition to $table\n"  if $0 !~ /\.t$/;
     $dbh->do("alter table $table add $field $definition");
     return 1;
+}
+
+sub _remove_field {
+    my $self = shift;
+    my ($table, $field ) = @_;
+
+    my $dbh = $CONNECTOR->dbh;
+    return if $CONNECTOR->dbh->{Driver}{Name} !~ /mysql/i;
+
+    my $sth = $dbh->column_info(undef,undef,$table,$field);
+    my $row = $sth->fetchrow_hashref;
+    $sth->finish;
+    return if !$row;
+
+    warn "INFO: removing $field to $table\n"  if $0 !~ /\.t$/;
+    $dbh->do("alter table $table drop column $field");
+    return 1;
+
 }
 
 sub _create_table {
@@ -815,13 +842,6 @@ sub search_domain {
     my $name = shift;
     my $import = shift;
 
-    my $vm = $self->search_vm('Void');
-    warn "No Void VM" if !$vm;
-    return if !$vm;
-
-    my $domain = $vm->search_domain($name, $import);
-    return $domain if $domain;
-
     my @vms;
     eval { @vms = $self->vm };
     return if $@ && $@ =~ /No VMs found/i;
@@ -838,6 +858,12 @@ sub search_domain {
         return $domain if $id || $import;
     }
 
+    return if !$VALID_VM{'Void'};
+    my $vm = $self->search_vm('Void');
+    warn "No Void VM" if !$vm;
+    return if !$vm;
+    my $domain = $vm->search_domain($name, $import);
+    return $domain if $domain;
 
     return;
 }
@@ -1645,6 +1671,28 @@ sub _cmd_force_shutdown {
 
 }
 
+sub _cmd_expose {
+    my ($self, $request) = @_;
+    my $uid = $request->args('uid');
+
+    my $user = Ravada::Auth::SQL->search_by_id( $uid);
+    my $domain = $self->search_domain_by_id($request->args('id_domain'));
+
+    $domain->expose($user, $request->args('port'), $request->args('name'));
+
+}
+
+sub _cmd_remove_expose {
+    my ($self, $request) = @_;
+    my $uid = $request->args('uid');
+
+    my $user = Ravada::Auth::SQL->search_by_id( $uid);
+    my $domain = $self->search_domain_by_id($request->args('id_domain'));
+
+    $domain->remove_expose($user, $request->args('port'));
+
+}
+
 sub _cmd_list_vm_types {
     my $self = shift;
     my $request = shift;
@@ -1705,6 +1753,7 @@ sub _req_method {
           start => \&_cmd_start
          ,pause => \&_cmd_pause
         ,create => \&_cmd_create
+        ,expose => \&_cmd_expose
         ,remove => \&_cmd_remove
         ,resume => \&_cmd_resume
       ,download => \&_cmd_download
@@ -1719,6 +1768,7 @@ sub _req_method {
  ,rename_domain => \&_cmd_rename_domain
  ,open_iptables => \&_cmd_open_iptables
  ,list_vm_types => \&_cmd_list_vm_types
+ ,remove_expose => \&_cmd_remove_expose
 ,force_shutdown => \&_cmd_force_shutdown
 
     );
@@ -1752,6 +1802,9 @@ sub search_vm {
 
     confess "Missing VM type"   if !$type;
 
+    confess "Invalid VM type '$type'\n" 
+        if !$VALID_VM{$type} && !$VALID_VM{uc($type)} && $type ne 'Void';
+
     my $class = 'Ravada::VM::'.uc($type);
 
     if ($type =~ /Void/i) {
@@ -1767,6 +1820,31 @@ sub search_vm {
         return $vm if ref($vm) eq $class;
     }
     return;
+}
+
+=head2 valid_vms
+
+Returns a list of valid VM types in this system
+
+  my @valid = $ravada->valid_vms();
+
+=cut
+
+sub valid_vms {
+    return ( sort keys %VALID_VM );
+}
+
+=head2 valid_vm
+
+Returns true if a VM type is valid
+
+=cut
+
+sub valid_vm {
+    my $self = shift;
+    my $type = shift;
+
+    return $VALID_VM{$type};
 }
 
 =head2 import_domain
@@ -1807,13 +1885,7 @@ Returns the version of the module
 =cut
 
 sub version {
-    my $version = $VERSION;
-    if ($version =~ /(alpha|beta)$/) {
-        my $rev_count = `git rev-list --count --all`;
-        chomp $rev_count;
-        $version .= $rev_count;
-    }
-    return $version;
+    return $VERSION;
 }
 
 
