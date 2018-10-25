@@ -1528,7 +1528,7 @@ sub _remove_iptables {
 }
 
 sub _test_iptables_jump {
-    my @cmd = ('iptables','-L','INPUT');
+    my @cmd = ('/sbin/iptables','-L','INPUT');
     my ($in, $out, $err);
 
     run3(\@cmd, \$in, \$out, \$err);
