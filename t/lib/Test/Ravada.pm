@@ -675,6 +675,6 @@ sub connector {
 }
 
 sub END {
-    remove_old_user() if $CONNECTOR;
+    remove_old_user() if $CONNECTOR && $RVD_BACK;
 }
 1;
