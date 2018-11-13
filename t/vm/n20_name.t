@@ -26,7 +26,7 @@ my $CHAIN = 'RAVADA';
 ##################################################################################
 
 sub _search_other_ip($ip) {
-    my $out = `ifconfig`;
+    my $out = `/sbin/ifconfig`;
     for my $line ( split /\n/, $out ) {
         my ($ip2) = $line =~ /inet.(\d+\.\d+\.\d+\.\d+) /;
 
