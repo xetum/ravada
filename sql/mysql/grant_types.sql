@@ -4,6 +4,6 @@ CREATE TABLE `grant_types` (
   `description` varchar(255) NOT NULL,
   `enabled` int default NULL,
     UNIQUE(`name`),
-    UNIQUE(`description`),
+    UNIQUE(description(100)),
   PRIMARY KEY (`id`)
 );

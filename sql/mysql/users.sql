@@ -8,6 +8,6 @@ CREATE TABLE `users` (
   `is_external` integer DEFAULT 0,
   `language` char(3) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
+  UNIQUE KEY `name` (name(170))
 );
 
